@@ -143,7 +143,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-.zoho_tokens
+/zoho_tokens.json
 
 # Spyder project settings
 .spyderproject
