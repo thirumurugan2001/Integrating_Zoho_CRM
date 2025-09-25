@@ -1,17 +1,51 @@
-from ZohoCRMAutomatedAuth import ZohoCRMLeadImporter
+from ZohoCRMAutomatedAuth import ZohoCRMAutomatedAuth
+from helper import excel_to_json
 
-def lead_import(sample_leads):
-    try :   
-        importer = ZohoCRMLeadImporter()
-        importer.import_leads_from_list(sample_leads)
-        return {
-            "message": "Successfully Created leads",
-            "statusCode": 400,
-            "status": False,
-        }
+def lead_import(file_path):
+    try : 
+        crm = ZohoCRMAutomatedAuth()    
+        if crm.test_api_connection():
+            crm.get_module_fields()        
+            records = excel_to_json(file_path)       
+            if records:
+                user_input = input("Do you want to proceed with pushing records to Zoho CRM? (y/n): ")
+                if user_input.lower() in ['y', 'yes']:
+                    success = crm.push_records_to_zoho(records)
+                    if success:
+                        return {
+                            "message": "Records pushed successfully!",
+                            "statusCode": 200,
+                            "status": True,
+                        }
+                    else:
+                        return {
+                            "message": "Failed to push some or all records",
+                            "statusCode": 400,  
+                            "status": False,
+                        }
+                else:
+                    return {
+                        "message": "Operation cancelled by user.",
+                        "statusCode": 400,  
+                        "status": False,
+                    }
+            else:
+                return {
+                    "message": "No records found in Excel file",
+                    "statusCode": 400,  
+                    "status": False,
+                }
+        else:
+            return {
+                    "message": "API connection failed!",
+                    "statusCode": 400,  
+                    "status": False,
+                    "data": [{}]
+                }
     except Exception as e:
         return {
             "message": str(e),
             "statusCode": 400,
             "status": False,
+            "data": [{}]
         }

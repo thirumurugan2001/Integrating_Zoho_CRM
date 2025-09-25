@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 import uvicorn
-from model import *
+from model import FilePath
 from controller import lead_validation
 app = FastAPI()
 
 @app.post("/api/create_leads")
-async def create_leads(leads: Leads):
+async def create_leads(path: FilePath):
     try:
-        response = lead_validation(leads.leads)
+        response = lead_validation(path.file_path)
         return response
     except Exception as e:
         print("Error in create_leads:", str(e))

@@ -1,27 +1,22 @@
 from Integration import lead_import
+import os
 
-def lead_validation(data):
+def lead_validation(file_path):
     try:
-        if isinstance(data, list): 
-            if len(data) > 0:
-                return lead_import(data)
-            else:
-                return {
-                    "message": "The list you provided is empty. Please ensure it is not empty.",
-                    "statusCode": 400,  
-                    "status": False,
-                    "data": [{}]
-                }
-        else:
+        if not os.path.exists(file_path):
             return {
-                "message": "Leads should be in list format.",
-                "statusCode": 400,   # ✅ corrected typo
+                "message": "The file path you provided does not exist. Please check the path and try again.",
+                "statusCode": 400,  
                 "status": False,
+                "data": [{}]
             }
-
+        else:
+            return lead_import(file_path)
     except Exception as e:
         return {
             "message": str(e),
             "statusCode": 400,
             "status": False,
         }
+    
+    

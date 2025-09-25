@@ -12,7 +12,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, WebDriverException, ElementNotInteractableException
 from selenium.webdriver.common.action_chains import ActionChains
 from dotenv import load_dotenv
+from helper import excel_to_json
 load_dotenv()
+
 
 class ZohoCRMAutomatedAuth:
 
@@ -26,6 +28,7 @@ class ZohoCRMAutomatedAuth:
         self.auth_url = os.getenv("AUTH_URL")
         self.token_url = os.getenv("TOKEN_URL")
         self.api_base_url = os.getenv("API_BASE_URL")
+        self.zoho_model_name = os.getenv("ZOHO_MODEL_NAME")
         self.access_token = None
         self.refresh_token = None
         self.token_expires_at = None
@@ -55,17 +58,23 @@ class ZohoCRMAutomatedAuth:
             driver.implicitly_wait(10)
             return driver
         except WebDriverException as e:
+            print(f"Error setting up driver: {e}")
             return None
         
     def wait_and_find_element(self, driver, selectors, timeout=30):
         wait = WebDriverWait(driver, timeout)
         for selector_type, selector_value in selectors:
             try:
-                if selector_type == "id":element = wait.until(EC.element_to_be_clickable((By.ID, selector_value)))
-                elif selector_type == "name":element = wait.until(EC.element_to_be_clickable((By.NAME, selector_value)))
-                elif selector_type == "xpath":element = wait.until(EC.element_to_be_clickable((By.XPATH, selector_value)))
-                elif selector_type == "css":element = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value)))
-                if element.is_displayed() and element.is_enabled():return element, selector_type, selector_value
+                if selector_type == "id":
+                    element = wait.until(EC.element_to_be_clickable((By.ID, selector_value)))
+                elif selector_type == "name":
+                    element = wait.until(EC.element_to_be_clickable((By.NAME, selector_value)))
+                elif selector_type == "xpath":
+                    element = wait.until(EC.element_to_be_clickable((By.XPATH, selector_value)))
+                elif selector_type == "css":
+                    element = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value)))
+                if element.is_displayed() and element.is_enabled():
+                    return element, selector_type, selector_value
             except (TimeoutException, ElementNotInteractableException):
                 continue
         return None, None, None
@@ -83,6 +92,7 @@ class ZohoCRMAutomatedAuth:
                     ActionChains(driver).move_to_element(element).click().perform()
                     return True
                 except Exception as e:
+                    print(f"Failed to click {description}: {e}")
                     return False
     
     def safe_send_keys(self, driver, element, text, description="field"):
@@ -97,6 +107,7 @@ class ZohoCRMAutomatedAuth:
                 driver.execute_script("arguments[0].value = arguments[1];", element, text)
                 return True
             except Exception as e:
+                print(f"Failed to enter text in {description}: {e}")
                 return False
     
     def handle_tfa_banner_page(self, driver):
@@ -122,7 +133,7 @@ class ZohoCRMAutomatedAuth:
                 ("xpath", "//button[contains(@class, 'primary')]"),
                 ("xpath", "//a[contains(@class, 'primary')]")
             ]
-            element = self.wait_and_find_element(driver, continue_selectors, 20)
+            element, _, _ = self.wait_and_find_element(driver, continue_selectors, 20)
             if element:
                 if self.safe_click(driver, element, "continue/skip button"):
                     time.sleep(3)
@@ -153,6 +164,7 @@ class ZohoCRMAutomatedAuth:
     def automate_oauth_flow(self, headless=False):
         driver = self.setup_driver(headless)
         if not driver:
+            print("Failed to setup driver")
             return False
         try:
             auth_url = self.get_authorization_url()
@@ -166,10 +178,10 @@ class ZohoCRMAutomatedAuth:
                 ("css", "input[type='email']"),
                 ("xpath", "//input[contains(@class, 'email')]")
             ]
-            email_element = self.wait_and_find_element(driver, email_selectors, 30)
+            email_element, _, _ = self.wait_and_find_element(driver, email_selectors, 30)
             if not email_element:
                 self.debug_page(driver)
-                return False
+                return False            
             if not self.safe_send_keys(driver, email_element, self.email, "email field"):
                 return False
             next_selectors = [
@@ -182,12 +194,12 @@ class ZohoCRMAutomatedAuth:
                 ("css", "button[type='submit']"),
                 ("xpath", "//button[@type='submit']")
             ]
-            next_element= self.wait_and_find_element(driver, next_selectors, 20)
+            next_element, _, _ = self.wait_and_find_element(driver, next_selectors, 20)
             if next_element:
                 if self.safe_click(driver, next_element, "next button"):
                     time.sleep(3)
             else:
-                print("⚠️ Next button not found, continuing...")
+                print("⚠️ Next button not found, continuing...")            
             password_selectors = [
                 ("id", "password"),
                 ("name", "PASSWORD"),
@@ -195,12 +207,12 @@ class ZohoCRMAutomatedAuth:
                 ("css", "input[type='password']"),
                 ("xpath", "//input[contains(@class, 'password')]")
             ]
-            password_element = self.wait_and_find_element(driver, password_selectors, 30)
+            password_element, _, _ = self.wait_and_find_element(driver, password_selectors, 30)
             if not password_element:
                 self.debug_page(driver)
                 return False
             if not self.safe_send_keys(driver, password_element, self.password, "password field"):
-                return False
+                return False            
             signin_selectors = [
                 ("id", "nextbtn"),
                 ("id", "signin_submit"),
@@ -212,17 +224,15 @@ class ZohoCRMAutomatedAuth:
                 ("css", "button[type='submit']"),
                 ("xpath", "//button[@type='submit']")
             ]
-            
-            signin_element = self.wait_and_find_element(driver, signin_selectors, 20)
+            signin_element, _, _ = self.wait_and_find_element(driver, signin_selectors, 20)
             if not signin_element:
                 self.debug_page(driver)
                 return False
             if not self.safe_click(driver, signin_element, "sign in button"):
                 return False
-            time.sleep(5)
+            time.sleep(5)            
             if self.handle_tfa_banner_page(driver):
-                time.sleep(3)
-            current_url = driver.current_url
+                time.sleep(3)            
             accept_selectors = [
                 ("xpath", "//button[contains(text(), 'Accept')]"),
                 ("xpath", "//button[contains(text(), 'Allow')]"),
@@ -236,13 +246,12 @@ class ZohoCRMAutomatedAuth:
                 ("xpath", "//button[contains(@class, 'accept')]"),
                 ("xpath", "//button[contains(@class, 'allow')]")
             ]
-            
-            accept_element = self.wait_and_find_element(driver, accept_selectors, 15)
+            accept_element, _, _ = self.wait_and_find_element(driver, accept_selectors, 15)
             if accept_element:
                 if self.safe_click(driver, accept_element, "accept button"):
                     time.sleep(3)
             else:
-                print("No authorization page found or already authorized")
+                print("No authorization page found or already authorized")            
             max_wait_time = 60
             start_time = time.time()
             while time.time() - start_time < max_wait_time:
@@ -257,6 +266,7 @@ class ZohoCRMAutomatedAuth:
                 parsed_url = urlparse(current_url)
                 code = parse_qs(parsed_url.query).get('code', [None])[0]                
                 if code:
+                    print("Authorization code obtained, getting access token...")
                     success = self.get_access_token(code)
                     return success
                 else:
@@ -289,7 +299,9 @@ class ZohoCRMAutomatedAuth:
                         }
                         elements_info.append(info)
                     except:
-                        continue                            
+                        continue
+            for info in elements_info:
+                print(f"  {info}")
         except Exception as e:
             print(f"Debug error: {e}")
     
@@ -301,16 +313,21 @@ class ZohoCRMAutomatedAuth:
             'redirect_uri': self.redirect_uri,
             'code': authorization_code
         }
-        response = requests.post(self.token_url, data=data)
-        if response.status_code == 200:
-            token_data = response.json()
-            self.access_token = token_data['access_token']
-            self.refresh_token = token_data['refresh_token']
-            expires_in = token_data.get('expires_in', 3600)
-            self.token_expires_at = datetime.now() + timedelta(seconds=expires_in)
-            self.save_tokens()
-            return True
-        else:
+        try:
+            response = requests.post(self.token_url, data=data)
+            if response.status_code == 200:
+                token_data = response.json()
+                self.access_token = token_data['access_token']
+                self.refresh_token = token_data['refresh_token']
+                expires_in = token_data.get('expires_in', 3600)
+                self.token_expires_at = datetime.now() + timedelta(seconds=expires_in)
+                self.save_tokens()
+                return True
+            else:
+                print(f"Failed to get access token: {response.status_code} - {response.text}")
+                return False
+        except Exception as e:
+            print(f"Error getting access token: {e}")
             return False
     
     def refresh_access_token(self):
@@ -322,15 +339,21 @@ class ZohoCRMAutomatedAuth:
             'client_secret': self.client_secret,
             'refresh_token': self.refresh_token
         }
-        response = requests.post(self.token_url, data=data)
-        if response.status_code == 200:
-            token_data = response.json()
-            self.access_token = token_data['access_token']
-            expires_in = token_data.get('expires_in', 3600)
-            self.token_expires_at = datetime.now() + timedelta(seconds=expires_in)
-            self.save_tokens()
-            return True
-        else:
+        try:
+            response = requests.post(self.token_url, data=data)
+            if response.status_code == 200:
+                token_data = response.json()
+                self.access_token = token_data['access_token']
+                expires_in = token_data.get('expires_in', 3600)
+                self.token_expires_at = datetime.now() + timedelta(seconds=expires_in)
+                self.save_tokens()
+                print("Access token refreshed successfully!")
+                return True
+            else:
+                print(f"Failed to refresh token: {response.status_code} - {response.text}")
+                return False
+        except Exception as e:
+            print(f"Error refreshing token: {e}")
             return False
     
     def save_tokens(self):
@@ -340,8 +363,11 @@ class ZohoCRMAutomatedAuth:
             'expires_at': self.token_expires_at.isoformat() if self.token_expires_at else None,
             'client_id': self.client_id
         }
-        with open(self.token_file, 'w') as f:
-            json.dump(token_data, f, indent=2)
+        try:
+            with open(self.token_file, 'w') as f:
+                json.dump(token_data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving tokens: {e}")
 
     def load_tokens(self):
         if os.path.exists(self.token_file):
@@ -359,9 +385,8 @@ class ZohoCRMAutomatedAuth:
         return False
     
     def ensure_valid_token(self):
-        print("Ensure valid token")
         if not self.access_token:
-            self.load_tokens()        
+            self.load_tokens()  
         if self.token_expires_at and datetime.now() >= self.token_expires_at:
             if not self.refresh_access_token():
                 return self.automate_oauth_flow()
@@ -369,62 +394,183 @@ class ZohoCRMAutomatedAuth:
         if not self.access_token:
             return self.automate_oauth_flow()
         return True
-
-class ZohoCRMLeadImporter(ZohoCRMAutomatedAuth):
-    def __init__(self):
-        super().__init__()
     
-    def get_headers(self):
-        return {
-            'Authorization': f'Zoho-oauthtoken {self.access_token}',
-            'Content-Type': 'application/json'
+    def format_record_for_zoho(self, record):
+        formatted_record = {}
+        field_mapping = {
+            "Lead_Owner": "Name",
+            "Email": "Email",
+            "Mobile_Number": "Mobile_Number",
+            "Date_of_Permit": "Date_of_Permit",
+            "Applicant_Name": "Applicant_Name",
+            "Nature_of_Development": "Nature_of_Development",
+            "Dueling_Units": "Dueling_Units",
+            "Lead_Source": "Lead_Source",
+            "Lead_Name": "Lead_Name",
+            "Reference": "Reference",
+            "No_of_bathrooms": "No_of_bathrooms",
+            "Company_Name": "Company_Name",
+            "Architect": "Architect",
+            "Plan_Permission": "Plan_Permission",
+            "Applicant_Address": "Applicant_Address",
+            "Future_Projects": "Future_Project", 
+            "Creation_Time": "Creation_Time",
+            "Which_Brand_Looking_for": "Which_Brand_Looking_for",
+            "How_Much_Square_Feet": "How_Much_Square_Feet"
         }
+        for excel_field, zoho_field in field_mapping.items():
+            if excel_field not in record or record[excel_field] is None:
+                continue
+            value = record[excel_field]
+            if excel_field in ["Creation_Time", "Date_of_Permit"]:
+                if isinstance(value, str):
+                    try:
+                        dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+                        formatted_record[zoho_field] = dt.strftime("%Y-%m-%dT%H:%M:%S+05:30")
+                    except ValueError:
+                        try:
+                            dt = datetime.strptime(value, "%Y-%m-%d")
+                            formatted_record[zoho_field] = dt.strftime("%Y-%m-%d")
+                        except ValueError:
+                            formatted_record[zoho_field] = str(value)
+                elif hasattr(value, "strftime"):
+                    formatted_record[zoho_field] = value.strftime("%Y-%m-%dT%H:%M:%S+05:30")
+                else:
+                    formatted_record[zoho_field] = str(value)
+            elif excel_field in ["Dueling_Units", "How_Much_Square_Feet", "No_of_bathrooms"]:
+                try:
+                    formatted_record[zoho_field] = str(int(float(value)))
+                except (ValueError, TypeError):
+                    formatted_record[zoho_field] = "0"
+            elif excel_field == "Email":
+                email_str = str(value).strip()
+                if "@" in email_str and "." in email_str:
+                    formatted_record[zoho_field] = email_str
+            elif excel_field == "Mobile_Number":
+                mobile_str = str(int(float(value))) if isinstance(value, (int, float)) else str(value).strip()
+                formatted_record[zoho_field] = mobile_str
+            else:
+                formatted_record[zoho_field] = str(value).strip()
+        if record.get("Applicant_Name"):
+            formatted_record["Name"] = str(record["Applicant_Name"]).strip()
+        elif record.get("Lead_Name"):
+            formatted_record["Name"] = str(record["Lead_Name"]).strip()
+        elif record.get("Company_Name"):
+            formatted_record["Name"] = str(record["Company_Name"]).strip()
+        else:
+            formatted_record["Name"] = f"Record_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        return formatted_record
+    
+    def push_records_to_zoho(self, records, batch_size=100):
+        if not self.ensure_valid_token():
+            print("Failed to ensure valid token")
+            return False
+        if not records:
+            print("No records to push")
+            return True 
+        print(f"Pushing {len(records)} records to Zoho CRM model: {self.zoho_model_name}")
+        total_records = len(records)
+        successful_records = 0
+        failed_records = 0
+        for i in range(0, total_records, batch_size):
+            batch = records[i:i + batch_size]
+            formatted_batch = []
+            for record in batch:
+                formatted_record = self.format_record_for_zoho(record)
+                if formatted_record:
+                    formatted_batch.append(formatted_record)
+            if not formatted_batch:
+                continue
+            url = f"{self.api_base_url}/{self.zoho_model_name}"
+            headers = {
+                'Authorization': f'Zoho-oauthtoken {self.access_token}',
+                'Content-Type': 'application/json'
+            }
+            payload = {
+                'data': formatted_batch,
+                'trigger': ['approval', 'workflow', 'blueprint']
+            }
+            try:
+                print(f"Pushing batch {i//batch_size + 1} ({len(formatted_batch)} records)...")
+                response = requests.post(url, json=payload, headers=headers)
+                if response.status_code == 201:
+                    response_data = response.json()
+                    batch_success = 0
+                    batch_failed = 0
+                    if 'data' in response_data:
+                        for result in response_data['data']:
+                            if result.get('status') == 'success':
+                                batch_success += 1
+                            else:
+                                batch_failed += 1
+                                print(f"Record failed: {result.get('message', 'Unknown error')}")
+                    successful_records += batch_success
+                    failed_records += batch_failed
+                else:
+                    failed_records += len(formatted_batch)
+                if i + batch_size < total_records:
+                    time.sleep(1)  
+            except Exception as e:
+                print(f"Error pushing batch: {e}")
+                failed_records += len(formatted_batch)
+        print(f"\nPush completed: {successful_records} successful, {failed_records} failed out of {total_records} total")
+        return successful_records > 0
     
     def test_api_connection(self):
         if not self.ensure_valid_token():
+            print("Failed to ensure valid token")
             return False
-        url = f"{self.api_base_url}/users"
-        response = requests.get(url, headers=self.get_headers())
-        if response.status_code == 200:
-            user_data = response.json()
-            return True
-        else:
-            return False
-    
-    def create_leads(self, leads_data):
-        if not self.ensure_valid_token():
-            return False
-        print("Start creating the Leads")
-        if not leads_data:
-            return False
-        formatted_leads = []
-        for lead in leads_data:
-            lead_record = {}
-            if 'Lead_Name' in lead or 'lead_name' in lead:lead_record['Last_Name'] = lead.get('Lead_Name') or lead.get('lead_name', '')
-            if 'Company' in lead or 'company' in lead:lead_record['Company'] = lead.get('Company') or lead.get('company', '')
-            if 'Email' in lead or 'email' in lead:lead_record['Email'] = lead.get('Email') or lead.get('email', '')
-            if 'Phone' in lead or 'phone' in lead:lead_record['Phone'] = lead.get('Phone') or lead.get('phone', '')
-            if 'Lead_Source' in lead or 'lead_source' in lead:lead_record['Lead_Source'] = lead.get('Lead_Source') or lead.get('lead_source', '')
-            if 'Lead_Owner' in lead or 'lead_owner' in lead:lead_record['Owner'] = lead.get('Lead_Owner') or lead.get('lead_owner', '')
-            formatted_leads.append(lead_record)
-        batch_size = 100
-        all_results = []
-        for i in range(0, len(formatted_leads), batch_size):
-            batch = formatted_leads[i:i + batch_size]
-            payload = {
-                "data": batch,
-                "trigger": ["approval", "workflow", "blueprint"]
-            }
-            url = f"{self.api_base_url}/Leads"
-            response = requests.post(url, headers=self.get_headers(), data=json.dumps(payload))
-            if response.status_code == 201:
-                result = response.json()
-                all_results.extend(result.get('data', []))
+        url = f"{self.api_base_url}/settings/modules"
+        headers = {
+            'Authorization': f'Zoho-oauthtoken {self.access_token}',
+            'Content-Type': 'application/json'
+        }
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                modules = response.json()
+                module_names = [module['api_name'] for module in modules.get('modules', [])]
+                print(f"Available modules: {module_names}")
+                if self.zoho_model_name in module_names:
+                    print(f"✅ Model '{self.zoho_model_name}' found!")
+                    return True
+                else:
+                    print(f"❌ Model '{self.zoho_model_name}' not found in available modules")
+                    return False
             else:
+                print(f"Failed to get modules: {response.status_code} - {response.text}")
                 return False
-        print("Leads Created Succssfully .... ")
-        return all_results
-    
-    def import_leads_from_list(self, leads_list):
-        results = self.create_leads(leads_list)
-        return results
+        except Exception as e:
+            print(f"Error testing API connection: {e}")
+            return False
+
+    def get_module_fields(self):
+        if not self.ensure_valid_token():
+            print("Failed to ensure valid token")
+            return False
+        url = f"{self.api_base_url}/settings/fields?module={self.zoho_model_name}"
+        headers = {
+            'Authorization': f'Zoho-oauthtoken {self.access_token}',
+            'Content-Type': 'application/json'
+        }
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                fields_data = response.json()
+                fields = fields_data.get('fields', [])                
+                print(f"\n📋 Fields available in '{self.zoho_model_name}' module:")
+                print("-" * 50)
+                for field in fields:
+                    field_name = field.get('api_name', 'Unknown')
+                    field_label = field.get('field_label', 'No Label')
+                    field_type = field.get('data_type', 'Unknown')
+                    required = field.get('required', False)                    
+                    status = "✅" if required else "⚪"
+                    print(f"{status} {field_name} ({field_label}) - Type: {field_type}")                
+                return True
+            else:
+                print(f"Failed to get fields: {response.status_code} - {response.text}")
+                return False
+        except Exception as e:
+            print(f"Error getting module fields: {e}")
+            return False
