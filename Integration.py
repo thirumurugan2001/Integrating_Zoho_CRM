@@ -8,24 +8,16 @@ def lead_import(file_path):
             crm.get_module_fields()        
             records = excel_to_json(file_path)       
             if records:
-                user_input = input("Do you want to proceed with pushing records to Zoho CRM? (y/n): ")
-                if user_input.lower() in ['y', 'yes']:
-                    success = crm.push_records_to_zoho(records)
-                    if success:
-                        return {
-                            "message": "Records pushed successfully!",
-                            "statusCode": 200,
-                            "status": True,
-                        }
-                    else:
-                        return {
-                            "message": "Failed to push some or all records",
-                            "statusCode": 400,  
-                            "status": False,
-                        }
+                success = crm.push_records_to_zoho(records)
+                if success:
+                    return {
+                        "message": "Records pushed successfully!",
+                        "statusCode": 200,
+                        "status": True,
+                    }
                 else:
                     return {
-                        "message": "Operation cancelled by user.",
+                        "message": "Failed to push some or all records",
                         "statusCode": 400,  
                         "status": False,
                     }

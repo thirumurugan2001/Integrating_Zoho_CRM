@@ -16,7 +16,7 @@ from helper import excel_to_json
 load_dotenv()
 
 
-class ZohoCRMAutomatedAuth:
+class ZohoCRMAutomatedAuth: 
 
     def __init__(self):
         self.client_id = os.getenv("CLIENT_ID")
@@ -125,7 +125,7 @@ class ZohoCRMAutomatedAuth:
                 ("xpath", "//input[@value='Skip']"),
                 ("id", "continue"),
                 ("id", "skip"),
-                ("id", "later"),
+                ("id", "later"), 
                 ("css", ".continue-btn"),
                 ("css", ".skip-btn"),
                 ("css", "button.primary"),
@@ -164,7 +164,6 @@ class ZohoCRMAutomatedAuth:
     def automate_oauth_flow(self, headless=False):
         driver = self.setup_driver(headless)
         if not driver:
-            print("Failed to setup driver")
             return False
         try:
             auth_url = self.get_authorization_url()
