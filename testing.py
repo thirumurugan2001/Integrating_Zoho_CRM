@@ -1,10 +1,12 @@
 import pandas as pd
 import re
-import tempfile
 from fuzzywuzzy import fuzz
 from typing import Optional
-
-def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'Area Name',sales_person_column_name: str = 'Sales Person',sheet_name: str = None,fuzzy_match_threshold: int = 85) -> str:
+import tempfile
+import os
+   
+def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'Area Name',sales_person_column_name: str = 'Sales Person',sheet_name: str = None,fuzzy_match_threshold: int = 85
+) -> str:
     SALES_PERSON_AREAS = {
         "Abhishek": [
             "Adambakkam", "Alandur", "Alandur Guindy", "Guindy", "Madipakkam", 
@@ -143,33 +145,14 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
         print(f"Error processing Excel file: {str(e)}")
         raise
 
-def excel_to_json(file_path: str):
+
+def example_usage():
     try:
-        df = pd.read_excel(file_path)
-        records = df.to_dict(orient="records")
-        cleaned_records = []
-        for record in records:
-            cleaned_record = {} 
-            for key, value in record.items():
-                if pd.notna(value):
-                    cleaned_record[key] = value
-            cleaned_records.append(cleaned_record)       
-        if cleaned_records:
-            sample_record = cleaned_records[0]
-            crm_columns = [ "Email ID", "Mobile No.", "Date of permit", 
-                "Applicant Name", "Nature of Development", "Dwelling Unit Info", 
-                "Lead_Source", "Lead_Name", "Reference", "No_of_bathrooms", 
-                "Company_Name", "Architect Name", "Planning Permission No.", 
-                "Applicant Address", "Future_Projects", "Creation_Time", 
-                "Which_Brand_Looking_for", "How_Much_Square_Feet"
-            ]
-            for crm_col in crm_columns:
-                if crm_col in sample_record:
-                    print(f"✅ {crm_col}: Found in Excel")
-                else:
-                    print(f"❌ {crm_col}: Missing from Excel")
-        return cleaned_records        
+        temp_path = assign_sales_person_to_areas(excel_file_path="Testing_data.xlsx")
+        print(f"Basic assignment completed successfully! Temp file: {temp_path}")
     except Exception as e:
-        print(f"Error in excel_to_json: {str(e)}")
-        return []
-    
+        print(f"Error in basic usage: {e}")
+
+
+if __name__ == "__main__":
+    example_usage()
