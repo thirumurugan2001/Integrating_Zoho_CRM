@@ -165,7 +165,7 @@ def excel_to_json(file_path: str):
             crm_columns = [
                 "Email ID", "Mobile No.", "Date of permit", 
                 "Applicant Name", "Nature of Development", "Dwelling Unit Info", 
-                "Lead_Source", "Lead_Name", "Reference", "No_of_bathrooms", 
+                "Sales Person", "Lead_Name", "Reference", "No_of_bathrooms", 
                 "Company_Name", "Architect Name", "Planning Permission No.", 
                 "Applicant Address", "Future_Projects", "Creation_Time", 
                 "Which_Brand_Looking_for", "How_Much_Square_Feet"
