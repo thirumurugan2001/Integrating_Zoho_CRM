@@ -96,6 +96,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             return ""
         normalized = re.sub(r'[^\w\s]', '', str(text).strip().lower())
         return re.sub(r'\s+', ' ', normalized)
+    
     def find_best_match(area_name: str) -> Optional[str]:
         if pd.isna(area_name) or area_name.strip() == "":
             return None
@@ -138,7 +139,6 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
 
         print(f"Results saved to temporary file: {temp_file_path}")
         return temp_file_path
-
     except Exception as e:
         print(f"Error processing Excel file: {str(e)}")
         raise
@@ -146,7 +146,12 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
 def excel_to_json(file_path: str):
     try:
         df = pd.read_excel(file_path)
+        print("\n📌 Columns available in Excel:")
+        for col in df.columns:
+            print(f"- {col}")
         records = df.to_dict(orient="records")
+        print(f"\nTotal records found in Excel: {len(records)}")
+
         cleaned_records = []
         for record in records:
             cleaned_record = {} 
@@ -154,22 +159,25 @@ def excel_to_json(file_path: str):
                 if pd.notna(value):
                     cleaned_record[key] = value
             cleaned_records.append(cleaned_record)       
+
         if cleaned_records:
             sample_record = cleaned_records[0]
-            crm_columns = [ "Email ID", "Mobile No.", "Date of permit", 
+            crm_columns = [
+                "Email ID", "Mobile No.", "Date of permit", 
                 "Applicant Name", "Nature of Development", "Dwelling Unit Info", 
                 "Lead_Source", "Lead_Name", "Reference", "No_of_bathrooms", 
                 "Company_Name", "Architect Name", "Planning Permission No.", 
                 "Applicant Address", "Future_Projects", "Creation_Time", 
                 "Which_Brand_Looking_for", "How_Much_Square_Feet"
             ]
+            print("\n🔍 CRM Column Check:")
             for crm_col in crm_columns:
                 if crm_col in sample_record:
                     print(f"✅ {crm_col}: Found in Excel")
                 else:
                     print(f"❌ {crm_col}: Missing from Excel")
         return cleaned_records        
+
     except Exception as e:
         print(f"Error in excel_to_json: {str(e)}")
         return []
-    

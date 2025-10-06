@@ -1,3 +1,4 @@
+# ZohoCRMAutomatedAuth.py
 import requests
 import json
 import time
@@ -12,7 +13,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, WebDriverException, ElementNotInteractableException
 from selenium.webdriver.common.action_chains import ActionChains
 from dotenv import load_dotenv
-from helper import excel_to_json
+import pandas as pd
 load_dotenv()
 
 
@@ -398,29 +399,34 @@ class ZohoCRMAutomatedAuth:
         formatted_record = {}
         field_mapping = {
             "Lead_Owner": "Name",
-            "Email": "Email",
-            "Mobile_Number": "Mobile_Number",
-            "Date_of_Permit": "Date_of_Permit",
-            "Applicant_Name": "Applicant_Name",
-            "Nature_of_Development": "Nature_of_Development",
-            "Dueling_Units": "Dueling_Units",
+            "Email ID": "Email",
+            "Mobile No.": "Mobile_Number",
+            "Date of permit": "Date_of_Permit",
+            "Applicant Name": "Applicant_Name",
+            "Nature of Development": "Nature_of_Development",
+            "Dwelling Unit Info": "Dueling_Units",
             "Lead_Source": "Lead_Source",
             "Lead_Name": "Lead_Name",
             "Reference": "Reference",
             "No_of_bathrooms": "No_of_bathrooms",
             "Company_Name": "Company_Name",
-            "Architect": "Architect",
-            "Plan_Permission": "Plan_Permission",
-            "Applicant_Address": "Applicant_Address",
+            "Architect Name": "Architect",
+            "Planning Permission No.": "Plan_Permission",
+            "Applicant Address": "Applicant_Address",
             "Future_Projects": "Future_Project", 
             "Creation_Time": "Creation_Time",
             "Which_Brand_Looking_for": "Which_Brand_Looking_for",
             "How_Much_Square_Feet": "How_Much_Square_Feet"
         }
+        
         for excel_field, zoho_field in field_mapping.items():
-            if excel_field not in record or record[excel_field] is None:
+            # If field is missing from Excel, set empty string
+            if excel_field not in record or record[excel_field] is None or pd.isna(record[excel_field]):
+                formatted_record[zoho_field] = ""
                 continue
+            
             value = record[excel_field]
+            
             if excel_field in ["Creation_Time", "Date_of_Permit"]:
                 if isinstance(value, str):
                     try:
@@ -445,19 +451,24 @@ class ZohoCRMAutomatedAuth:
                 email_str = str(value).strip()
                 if "@" in email_str and "." in email_str:
                     formatted_record[zoho_field] = email_str
+                else:
+                    formatted_record[zoho_field] = ""  # Invalid email
             elif excel_field == "Mobile_Number":
                 mobile_str = str(int(float(value))) if isinstance(value, (int, float)) else str(value).strip()
                 formatted_record[zoho_field] = mobile_str
             else:
                 formatted_record[zoho_field] = str(value).strip()
-        if record.get("Applicant_Name"):
+        
+        # Handle Name field
+        if record.get("Applicant_Name") and not pd.isna(record.get("Applicant_Name")):
             formatted_record["Name"] = str(record["Applicant_Name"]).strip()
-        elif record.get("Lead_Name"):
+        elif record.get("Lead_Name") and not pd.isna(record.get("Lead_Name")):
             formatted_record["Name"] = str(record["Lead_Name"]).strip()
-        elif record.get("Company_Name"):
+        elif record.get("Company_Name") and not pd.isna(record.get("Company_Name")):
             formatted_record["Name"] = str(record["Company_Name"]).strip()
         else:
             formatted_record["Name"] = f"Record_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
         return formatted_record
     
     def push_records_to_zoho(self, records, batch_size=100):
@@ -480,6 +491,11 @@ class ZohoCRMAutomatedAuth:
                     formatted_batch.append(formatted_record)
             if not formatted_batch:
                 continue
+            
+            # Print the payload being sent for debugging
+            print(f"\n📤 Payload being sent to Zoho:")
+            print(json.dumps({'data': formatted_batch}, indent=2))
+            
             url = f"{self.api_base_url}/{self.zoho_model_name}"
             headers = {
                 'Authorization': f'Zoho-oauthtoken {self.access_token}',
@@ -492,6 +508,12 @@ class ZohoCRMAutomatedAuth:
             try:
                 print(f"Pushing batch {i//batch_size + 1} ({len(formatted_batch)} records)...")
                 response = requests.post(url, json=payload, headers=headers)
+                
+                # Print full response details
+                print(f"\n📥 Response Status Code: {response.status_code}")
+                print(f"📥 Response Body:")
+                print(json.dumps(response.json(), indent=2))
+                
                 if response.status_code == 201:
                     response_data = response.json()
                     batch_success = 0
@@ -502,17 +524,21 @@ class ZohoCRMAutomatedAuth:
                                 batch_success += 1
                             else:
                                 batch_failed += 1
-                                print(f"Record failed: {result.get('message', 'Unknown error')}")
+                                print(f"❌ Record failed: {result.get('message', 'Unknown error')}")
+                                print(f"   Details: {result.get('details', 'No details')}")
                     successful_records += batch_success
                     failed_records += batch_failed
                 else:
+                    print(f"❌ HTTP Error {response.status_code}: {response.text}")
                     failed_records += len(formatted_batch)
                 if i + batch_size < total_records:
                     time.sleep(1)  
             except Exception as e:
-                print(f"Error pushing batch: {e}")
+                print(f"❌ Exception while pushing batch: {e}")
+                import traceback
+                traceback.print_exc()
                 failed_records += len(formatted_batch)
-        print(f"\nPush completed: {successful_records} successful, {failed_records} failed out of {total_records} total")
+        print(f"\n✅ Push completed: {successful_records} successful, {failed_records} failed out of {total_records} total")
         return successful_records > 0
     
     def test_api_connection(self):
