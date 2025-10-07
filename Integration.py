@@ -1,11 +1,12 @@
 from ZohoCRMAutomatedAuth import ZohoCRMAutomatedAuth
-from helper import excel_to_json,assign_sales_person_to_areas
+from helper import excel_to_json,assign_sales_person_to_areas,separate_and_store_temp
 
 def lead_import(file_path):
     try : 
         crm = ZohoCRMAutomatedAuth()    
         if crm.test_api_connection():
             crm.get_module_fields()
+            file_path = separate_and_store_temp(file_path)
             temp_path = assign_sales_person_to_areas(excel_file_path=file_path)
             records = excel_to_json(temp_path)       
             if records:

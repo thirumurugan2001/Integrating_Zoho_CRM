@@ -4,6 +4,27 @@ import tempfile
 from fuzzywuzzy import fuzz
 from typing import Optional
 
+def separate_and_store_temp(filepath):
+    keywords = ["school building", "hospital", "college", "inst", "kalayaan mandapam"]
+    try:
+        df = pd.read_excel(filepath)        
+        required_cols = ["Dwelling Unit Info", "Nature of Development"]
+        for col in required_cols:
+            if col not in df.columns:
+                raise ValueError(f"Missing required column: {col}")        
+        cond1 = df["Dwelling Unit Info"].notna() & (df["Dwelling Unit Info"].astype(str).str.strip() != "")        
+        cond2 = df["Dwelling Unit Info"].isna() | (df["Dwelling Unit Info"].astype(str).str.strip() == "")
+        cond2 = cond2 & df["Nature of Development"].astype(str).str.lower().apply(
+            lambda x: any(k in x for k in keywords))        
+        filtered_df = df[cond1 | cond2]        
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        filtered_df.to_excel(temp_file.name, index=False)
+        print(f"✅ Filtered data saved to: {temp_file.name}")
+        return temp_file.name
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return None
+
 def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'Area Name',sales_person_column_name: str = 'Sales Person',sheet_name: str = None,fuzzy_match_threshold: int = 85) -> str:
     SALES_PERSON_AREAS = {
         "Abhishek": [
@@ -146,12 +167,11 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
 def excel_to_json(file_path: str):
     try:
         df = pd.read_excel(file_path)
-        print("\n📌 Columns available in Excel:")
+        print("📌 Columns available in Excel:")
         for col in df.columns:
             print(f"- {col}")
         records = df.to_dict(orient="records")
-        print(f"\nTotal records found in Excel: {len(records)}")
-
+        print(f"Total records found in Excel: {len(records)}")
         cleaned_records = []
         for record in records:
             cleaned_record = {} 
@@ -159,7 +179,6 @@ def excel_to_json(file_path: str):
                 if pd.notna(value):
                     cleaned_record[key] = value
             cleaned_records.append(cleaned_record)       
-
         if cleaned_records:
             sample_record = cleaned_records[0]
             crm_columns = [
@@ -181,3 +200,5 @@ def excel_to_json(file_path: str):
     except Exception as e:
         print(f"Error in excel_to_json: {str(e)}")
         return []
+
+
