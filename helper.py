@@ -167,11 +167,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
 def excel_to_json(file_path: str):
     try:
         df = pd.read_excel(file_path)
-        print("📌 Columns available in Excel:")
-        for col in df.columns:
-            print(f"- {col}")
         records = df.to_dict(orient="records")
-        print(f"Total records found in Excel: {len(records)}")
         cleaned_records = []
         for record in records:
             cleaned_record = {} 

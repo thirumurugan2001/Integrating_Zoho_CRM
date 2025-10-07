@@ -1,4 +1,3 @@
-# ZohoCRMAutomatedAuth.py
 import requests
 import json
 import time
@@ -12,8 +11,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, WebDriverException, ElementNotInteractableException
 from selenium.webdriver.common.action_chains import ActionChains
-from dotenv import load_dotenv
 import pandas as pd
+from dotenv import load_dotenv
 load_dotenv()
 
 
@@ -403,8 +402,8 @@ class ZohoCRMAutomatedAuth:
             "Mobile No.": "Mobile_Number",
             "Date of permit": "Date_of_Permit",
             "Applicant Name": "Applicant_Name",
-            "Nature of Developments": "Nature_of_Development",
-            "Dwelling Unit Info": "Dueling_Units",
+            "Nature of Development": "Nature_of_Developments",
+            "Dwelling Unit Info": "Dwelling_Unit_Info",
             "Sales Person": "Lead_Source",
             "Lead_Name": "Lead_Name",
             "Reference": "Reference",
@@ -420,7 +419,6 @@ class ZohoCRMAutomatedAuth:
         }
         
         for excel_field, zoho_field in field_mapping.items():
-            # If field is missing from Excel, set empty string
             if excel_field not in record or record[excel_field] is None or pd.isna(record[excel_field]):
                 formatted_record[zoho_field] = ""
                 continue
@@ -478,7 +476,6 @@ class ZohoCRMAutomatedAuth:
         if not records:
             print("No records to push")
             return True 
-        print(f"Pushing {len(records)} records to Zoho CRM model: {self.zoho_model_name}")
         total_records = len(records)
         successful_records = 0
         failed_records = 0
@@ -491,9 +488,7 @@ class ZohoCRMAutomatedAuth:
                     formatted_batch.append(formatted_record)
             if not formatted_batch:
                 continue
-            
-            # Print the payload being sent for debugging
-            print(f"\n📤 Payload being sent to Zoho:")
+
             print(json.dumps({'data': formatted_batch}, indent=2))
             
             url = f"{self.api_base_url}/{self.zoho_model_name}"
@@ -506,14 +501,7 @@ class ZohoCRMAutomatedAuth:
                 'trigger': ['approval', 'workflow', 'blueprint']
             }
             try:
-                print(f"Pushing batch {i//batch_size + 1} ({len(formatted_batch)} records)...")
                 response = requests.post(url, json=payload, headers=headers)
-                
-                # Print full response details
-                print(f"\n📥 Response Status Code: {response.status_code}")
-                print(f"📥 Response Body:")
-                print(json.dumps(response.json(), indent=2))
-                
                 if response.status_code == 201:
                     response_data = response.json()
                     batch_success = 0
@@ -583,18 +571,14 @@ class ZohoCRMAutomatedAuth:
             if response.status_code == 200:
                 fields_data = response.json()
                 fields = fields_data.get('fields', [])                
-                print(f"\n📋 Fields available in '{self.zoho_model_name}' module:")
-                print("-" * 50)
                 for field in fields:
                     field_name = field.get('api_name', 'Unknown')
                     field_label = field.get('field_label', 'No Label')
                     field_type = field.get('data_type', 'Unknown')
                     required = field.get('required', False)                    
                     status = "✅" if required else "⚪"
-                    print(f"{status} {field_name} ({field_label}) - Type: {field_type}")                
                 return True
             else:
-                print(f"Failed to get fields: {response.status_code} - {response.text}")
                 return False
         except Exception as e:
             print(f"Error getting module fields: {e}")
