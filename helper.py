@@ -25,7 +25,40 @@ def separate_and_store_temp(filepath):
         print(f"❌ Error: {e}")
         return None
 
-def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'Area Name',sales_person_column_name: str = 'Sales Person',sheet_name: str = None,fuzzy_match_threshold: int = 85) -> str:
+def excel_to_json(file_path: str):
+    try:
+        df = pd.read_excel(file_path)
+        records = df.to_dict(orient="records")
+        cleaned_records = []
+        for record in records:
+            cleaned_record = {} 
+            for key, value in record.items():
+                if pd.notna(value):
+                    cleaned_record[key] = value
+            cleaned_records.append(cleaned_record)       
+        if cleaned_records:
+            sample_record = cleaned_records[0]
+            crm_columns = [
+                "Email ID", "Mobile No.", "Date of permit", 
+                "Applicant Name", "Nature of Development", "Dwelling Unit Info", 
+                "Sales Person", "Lead_Name", "Reference", "No_of_bathrooms", 
+                "Company_Name", "Architect Name", "Planning Permission No.", 
+                "Applicant Address", "Future_Projects", "Creation_Time", 
+                "Which_Brand_Looking_for", "How_Much_Square_Feet"
+            ]
+            print("\n🔍 CRM Column Check:")
+            for crm_col in crm_columns:
+                if crm_col in sample_record:
+                    print(f"✅ {crm_col}: Found in Excel")
+                else:
+                    print(f"❌ {crm_col}: Missing from Excel")
+        return cleaned_records        
+
+    except Exception as e:
+        print(f"Error in excel_to_json: {str(e)}")
+        return []
+
+def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'Area Name',sales_person_column_name: str = 'Sales Person',sheet_name: str = None,fuzzy_match_threshold: int = 85) -> str:    
     SALES_PERSON_AREAS = {
         "Abhishek": [
             "Adambakkam", "Alandur", "Alandur Guindy", "Guindy", "Madipakkam", 
@@ -72,7 +105,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
         "Sithalapakkam": [
             "Sithalapakkam"
         ],
-        "Jagan / Balacahnder": [
+        "Jagan / Balachander": [
             "Adayalampattu", "Alamathi", "Ambathur", "Ambattur", "Arumandai", 
             "at Kondakarai Kuruvimedu Panchayat Road and", "at Orakkadu", 
             "at Puzhal", "Ayanambakkam", "Ayanavaram", "Budur", "BUDUR", 
@@ -90,26 +123,18 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             "Veeraragavapuram", "Veeraraghavapuram", "Venkatapuram", 
             "Vilangadupakkam", "Villivakkam", "Ward No. I of Paruthipattu"
         ],
-        "Ventakesh / Karthik": [
-            "Arasankalani", "Arasankazhani"
-        ],
         "Karthik / Ventakesh": [
             "Gerugambakkam", "Kollacheri", "Kulappakkam", "Kuthambakkam", 
             "Poonamallee", "Rendamkattalai", "Rendankattalai", "Sikkarayapuram", 
-            "Vellavedu", "Zamin Pallavaram", "Zamin Pallvaram"
+            "Vellavedu", "Zamin Pallavaram", "Zamin Pallvaram", "Mambalam", 
+            "Arasankalani", "Arasankazhani"
         ],
-        "Karthik / Jagan": [
-            "Mambalam"
-        ],
-        "Jagan / karthik": [
+        "Jagan / Karthik": [
             "Mylapore", "T. Nagar", "T.Nagar"
         ],
         "Ventakesh / Dinikaran": [
             "Part Kottivakkam", "Semmancheri", "Semmanchery"
         ],
-        "Jagan /  Balachander": [
-            "Sholavaram", "Sirugavoor"
-        ]
     }
     
     def normalize_text(text: str) -> str:
@@ -134,6 +159,55 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
                     best_match = sales_person
                     best_score = score
         return best_match
+    
+    def split_shared_assignments(df: pd.DataFrame, sales_col: str) -> pd.DataFrame:
+        shared_mask = df[sales_col].str.contains('/', na=False)        
+        if not shared_mask.any():
+            return df
+        result_rows = []
+        for idx, row in df.iterrows():
+            sales_person = row[sales_col]            
+            if pd.isna(sales_person) or '/' not in sales_person:
+                result_rows.append(row)
+            else:
+                salespeople = [sp.strip() for sp in sales_person.split('/')]                
+                result_rows.append({
+                    'row': row,
+                    'salespeople': salespeople,
+                    'is_shared': True
+                })        
+        final_rows = []
+        shared_groups = {}
+        for item in result_rows:
+            if isinstance(item, dict) and item.get('is_shared'):
+                key = ' / '.join(item['salespeople'])
+                if key not in shared_groups:
+                    shared_groups[key] = []
+                shared_groups[key].append(item['row'])
+            else:
+                final_rows.append(item)        
+        for shared_key, rows in shared_groups.items():
+            salespeople = shared_key.split(' / ')
+            num_salespeople = len(salespeople)
+            num_records = len(rows)
+            
+            if num_records == 1:
+                row_copy = rows[0].copy()
+                row_copy[sales_col] = salespeople[0]
+                final_rows.append(row_copy)
+            else:
+                records_per_person = num_records // num_salespeople
+                remainder = num_records % num_salespeople
+                start_idx = 0
+                for i, salesperson in enumerate(salespeople):
+                    count = records_per_person + (1 if i < remainder else 0)
+                    end_idx = start_idx + count
+                    for row in rows[start_idx:end_idx]:
+                        row_copy = row.copy()
+                        row_copy[sales_col] = salesperson
+                        final_rows.append(row_copy)
+                    start_idx = end_idx
+        return pd.DataFrame(final_rows).reset_index(drop=True)
     try:
         if sheet_name:
             df = pd.read_excel(excel_file_path, sheet_name=sheet_name)
@@ -145,56 +219,26 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
         result_df = df.copy()
         print("Assigning sales persons based on area matching...")
         result_df[sales_person_column_name] = result_df[area_column_name].apply(find_best_match)
+        print("Splitting shared salesperson assignments...")
+        result_df = split_shared_assignments(result_df, sales_person_column_name)
         matched_count = result_df[sales_person_column_name].notna().sum()
         unmatched_count = len(result_df) - matched_count
-        print(f"Assignment completed:\n  - Matched areas: {matched_count}\n  - Unmatched areas: {unmatched_count}")
-
+        print(f"\nAssignment completed:")
+        print(f"  - Matched areas: {matched_count}")
+        print(f"  - Unmatched areas: {unmatched_count}")
+        print("\nDistribution by salesperson:")
+        distribution = result_df[sales_person_column_name].value_counts()
+        for sp, count in distribution.items():
+            print(f"  - {sp}: {count}")
         if unmatched_count > 0:
             unmatched_areas = result_df[result_df[sales_person_column_name].isna()][area_column_name].unique()
-            print(f"Unmatched areas: {list(unmatched_areas)}")
-
+            print(f"\nUnmatched areas: {list(unmatched_areas)}")
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         result_df.to_excel(temp_file.name, index=False)
         temp_file_path = temp_file.name
         temp_file.close()
-
-        print(f"Results saved to temporary file: {temp_file_path}")
+        print(f"\nResults saved to temporary file: {temp_file_path}")
         return temp_file_path
     except Exception as e:
         print(f"Error processing Excel file: {str(e)}")
-        raise
-
-def excel_to_json(file_path: str):
-    try:
-        df = pd.read_excel(file_path)
-        records = df.to_dict(orient="records")
-        cleaned_records = []
-        for record in records:
-            cleaned_record = {} 
-            for key, value in record.items():
-                if pd.notna(value):
-                    cleaned_record[key] = value
-            cleaned_records.append(cleaned_record)       
-        if cleaned_records:
-            sample_record = cleaned_records[0]
-            crm_columns = [
-                "Email ID", "Mobile No.", "Date of permit", 
-                "Applicant Name", "Nature of Development", "Dwelling Unit Info", 
-                "Sales Person", "Lead_Name", "Reference", "No_of_bathrooms", 
-                "Company_Name", "Architect Name", "Planning Permission No.", 
-                "Applicant Address", "Future_Projects", "Creation_Time", 
-                "Which_Brand_Looking_for", "How_Much_Square_Feet"
-            ]
-            print("\n🔍 CRM Column Check:")
-            for crm_col in crm_columns:
-                if crm_col in sample_record:
-                    print(f"✅ {crm_col}: Found in Excel")
-                else:
-                    print(f"❌ {crm_col}: Missing from Excel")
-        return cleaned_records        
-
-    except Exception as e:
-        print(f"Error in excel_to_json: {str(e)}")
-        return []
-
-
+        raise e
