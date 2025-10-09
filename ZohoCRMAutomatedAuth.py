@@ -1,3 +1,4 @@
+# ZohoCRMAutomatedAuth.py
 import requests
 import json
 import time
@@ -407,7 +408,6 @@ class ZohoCRMAutomatedAuth:
             "Sales Person": "Lead_Source",
             "Lead_Name": "Lead_Name",
             "Reference": "Reference",
-            "No_of_bathrooms": "No_of_bathrooms",
             "Company_Name": "Company_Name",
             "Architect Name": "Architect",
             "Planning Permission No.": "Plan_Permission",
@@ -415,8 +415,19 @@ class ZohoCRMAutomatedAuth:
             "Future_Projects": "Future_Project", 
             "Creation_Time": "Creation_Time",
             "Which_Brand_Looking_for": "Which_Brand_Looking_for",
-            "How_Much_Square_Feet": "How_Much_Square_Feet"
-        }
+            "How_Much_Square_Feet": "How_Much_Square_Feet",
+            "Area Name": "Area_Name",  
+            "Site Address": "Site_Address"
+        }        
+        try:
+            dwelling_units = record.get("Dwelling Unit Info", 0)
+            if dwelling_units and not pd.isna(dwelling_units):
+                bathrooms = int(float(dwelling_units)) * 2
+                formatted_record["No_of_bathrooms"] = str(bathrooms)
+            else:
+                formatted_record["No_of_bathrooms"] = "0"
+        except (ValueError, TypeError):
+            formatted_record["No_of_bathrooms"] = "0"
         
         for excel_field, zoho_field in field_mapping.items():
             if excel_field not in record or record[excel_field] is None or pd.isna(record[excel_field]):
@@ -440,26 +451,26 @@ class ZohoCRMAutomatedAuth:
                     formatted_record[zoho_field] = value.strftime("%Y-%m-%dT%H:%M:%S+05:30")
                 else:
                     formatted_record[zoho_field] = str(value)
-            elif excel_field in ["Dueling_Units", "How_Much_Square_Feet", "No_of_bathrooms"]:
+            elif excel_field in ["Dwelling Unit Info", "How_Much_Square_Feet"]:
                 try:
                     formatted_record[zoho_field] = str(int(float(value)))
                 except (ValueError, TypeError):
                     formatted_record[zoho_field] = "0"
-            elif excel_field == "Email":
+            elif excel_field == "Email ID":
                 email_str = str(value).strip()
                 if "@" in email_str and "." in email_str:
                     formatted_record[zoho_field] = email_str
                 else:
-                    formatted_record[zoho_field] = ""  # Invalid email
-            elif excel_field == "Mobile_Number":
+                    formatted_record[zoho_field] = "" 
+            elif excel_field == "Mobile No.":
                 mobile_str = str(int(float(value))) if isinstance(value, (int, float)) else str(value).strip()
                 formatted_record[zoho_field] = mobile_str
             else:
                 formatted_record[zoho_field] = str(value).strip()
         
-        # Handle Name field
-        if record.get("Applicant_Name") and not pd.isna(record.get("Applicant_Name")):
-            formatted_record["Name"] = str(record["Applicant_Name"]).strip()
+        # Set the Name field
+        if record.get("Applicant Name") and not pd.isna(record.get("Applicant Name")):
+            formatted_record["Name"] = str(record["Applicant Name"]).strip()
         elif record.get("Lead_Name") and not pd.isna(record.get("Lead_Name")):
             formatted_record["Name"] = str(record["Lead_Name"]).strip()
         elif record.get("Company_Name") and not pd.isna(record.get("Company_Name")):
@@ -468,8 +479,9 @@ class ZohoCRMAutomatedAuth:
             formatted_record["Name"] = f"Record_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
         return formatted_record
-    
+
     def push_records_to_zoho(self, records, batch_size=100):
+        """Push records to Zoho CRM in batches"""
         if not self.ensure_valid_token():
             print("Failed to ensure valid token")
             return False
@@ -479,6 +491,7 @@ class ZohoCRMAutomatedAuth:
         total_records = len(records)
         successful_records = 0
         failed_records = 0
+        
         for i in range(0, total_records, batch_size):
             batch = records[i:i + batch_size]
             formatted_batch = []
@@ -526,9 +539,10 @@ class ZohoCRMAutomatedAuth:
                 import traceback
                 traceback.print_exc()
                 failed_records += len(formatted_batch)
+        
         print(f"\n✅ Push completed: {successful_records} successful, {failed_records} failed out of {total_records} total")
         return successful_records > 0
-    
+      
     def test_api_connection(self):
         if not self.ensure_valid_token():
             print("Failed to ensure valid token")
@@ -583,3 +597,37 @@ class ZohoCRMAutomatedAuth:
         except Exception as e:
             print(f"Error getting module fields: {e}")
             return False
+        
+# helper.py
+def excel_to_json(file_path: str):
+    try:
+        df = pd.read_excel(file_path)
+        records = df.to_dict(orient="records")
+        cleaned_records = []
+        for record in records:
+            cleaned_record = {} 
+            for key, value in record.items():
+                if pd.notna(value):
+                    cleaned_record[key] = value
+            cleaned_records.append(cleaned_record)       
+        if cleaned_records:
+            sample_record = cleaned_records[0]
+            crm_columns = [
+                "Email ID", "Mobile No.", "Date of permit", "Site Address",
+                "Applicant Name", "Nature of Development", "Dwelling Unit Info","Area Name", 
+                "Sales Person", "Lead_Name", "Reference", "No_of_bathrooms", 
+                "Company_Name", "Architect Name", "Planning Permission No.", 
+                "Applicant Address", "Future_Projects", "Creation_Time", 
+                "Which_Brand_Looking_for", "How_Much_Square_Feet"
+            ]
+            print("\n🔍 CRM Column Check:")
+            for crm_col in crm_columns:
+                if crm_col in sample_record:
+                    print(f"✅ {crm_col}: Found in Excel")
+                else:
+                    print(f"❌ {crm_col}: Missing from Excel")
+        return cleaned_records        
+
+    except Exception as e:
+        print(f"Error in excel_to_json: {str(e)}")
+        return []

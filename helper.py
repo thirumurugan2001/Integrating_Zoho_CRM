@@ -39,10 +39,9 @@ def excel_to_json(file_path: str):
         if cleaned_records:
             sample_record = cleaned_records[0]
             crm_columns = [
-                "Email ID", "Mobile No.", "Date of permit", 
-                "Applicant Name", "Nature of Development", "Dwelling Unit Info", 
-                "Sales Person", "Lead_Name", "Reference", "No_of_bathrooms", 
-                "Company_Name", "Architect Name", "Planning Permission No.", 
+                "Email ID", "Mobile No.", "Date of permit", "Site Address",
+                "Applicant Name", "Nature of Development", "Dwelling Unit Info","Area Name", 
+                "Sales Person", "Lead_Name", "Reference", "Company_Name", "Architect Name", "Planning Permission No.", 
                 "Applicant Address", "Future_Projects", "Creation_Time", 
                 "Which_Brand_Looking_for", "How_Much_Square_Feet"
             ]
