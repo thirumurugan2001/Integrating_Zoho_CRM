@@ -1,4 +1,3 @@
-# ZohoCRMAutomatedAuth.py
 import requests
 import json
 import time
@@ -13,6 +12,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, WebDriverException, ElementNotInteractableException
 from selenium.webdriver.common.action_chains import ActionChains
 import pandas as pd
+import re
+import traceback
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -418,24 +419,41 @@ class ZohoCRMAutomatedAuth:
             "How_Much_Square_Feet": "How_Much_Square_Feet",
             "Area Name": "Area_Name",  
             "Site Address": "Site_Address"
-        }        
+        }                
         try:
-            dwelling_units = record.get("Dwelling Unit Info", 0)
-            if dwelling_units and not pd.isna(dwelling_units):
-                bathrooms = int(float(dwelling_units)) * 2
-                formatted_record["No_of_bathrooms"] = str(bathrooms)
+            dwelling_units = record.get("Dwelling Unit Info")
+            if dwelling_units is not None and not pd.isna(dwelling_units):
+                dwelling_str = str(dwelling_units).strip()
+                if dwelling_str and dwelling_str != '' and dwelling_str.lower() != 'nan':
+                    try:
+                        numbers = re.findall(r'\d+', dwelling_str)
+                        if numbers:
+                            dwelling_value = int(numbers[0])
+                            bathrooms = dwelling_value * 2
+                            formatted_record["No_of_bathrooms"] = str(bathrooms)
+                            print(f"✅ Calculated bathrooms: {dwelling_value} units × 2 = {bathrooms} bathrooms")
+                        else:
+                            print(f"⚠️ No numeric value found in dwelling units '{dwelling_str}'")
+                            formatted_record["No_of_bathrooms"] = "0"
+                    except (ValueError, TypeError) as e:
+                        print(f"⚠️ Could not extract number from dwelling units '{dwelling_str}': {e}")
+                        formatted_record["No_of_bathrooms"] = "0"
+                else:
+                    print(f"⚠️ Dwelling Unit Info is empty or invalid")
+                    formatted_record["No_of_bathrooms"] = "0"
             else:
+                print(f"⚠️ Dwelling Unit Info is None or NaN")
                 formatted_record["No_of_bathrooms"] = "0"
-        except (ValueError, TypeError):
+        except Exception as e:
+            print(f"❌ Error calculating bathrooms: {e}")
+            traceback.print_exc()
             formatted_record["No_of_bathrooms"] = "0"
         
         for excel_field, zoho_field in field_mapping.items():
             if excel_field not in record or record[excel_field] is None or pd.isna(record[excel_field]):
                 formatted_record[zoho_field] = ""
                 continue
-            
             value = record[excel_field]
-            
             if excel_field in ["Creation_Time", "Date_of_Permit"]:
                 if isinstance(value, str):
                     try:
@@ -450,12 +468,16 @@ class ZohoCRMAutomatedAuth:
                 elif hasattr(value, "strftime"):
                     formatted_record[zoho_field] = value.strftime("%Y-%m-%dT%H:%M:%S+05:30")
                 else:
-                    formatted_record[zoho_field] = str(value)
+                    formatted_record[zoho_field] = str(value)            
             elif excel_field in ["Dwelling Unit Info", "How_Much_Square_Feet"]:
                 try:
-                    formatted_record[zoho_field] = str(int(float(value)))
+                    numbers = re.findall(r'\d+', str(value))
+                    if numbers:
+                        formatted_record[zoho_field] = numbers[0]
+                    else:
+                        formatted_record[zoho_field] = "0"
                 except (ValueError, TypeError):
-                    formatted_record[zoho_field] = "0"
+                    formatted_record[zoho_field] = "0"            
             elif excel_field == "Email ID":
                 email_str = str(value).strip()
                 if "@" in email_str and "." in email_str:
@@ -463,12 +485,14 @@ class ZohoCRMAutomatedAuth:
                 else:
                     formatted_record[zoho_field] = "" 
             elif excel_field == "Mobile No.":
-                mobile_str = str(int(float(value))) if isinstance(value, (int, float)) else str(value).strip()
-                formatted_record[zoho_field] = mobile_str
+                try:
+                    mobile_str = str(value).strip()
+                    mobile_clean = re.sub(r'[^\d+]', '', mobile_str)
+                    formatted_record[zoho_field] = mobile_clean
+                except:
+                    formatted_record[zoho_field] = str(value).strip()
             else:
                 formatted_record[zoho_field] = str(value).strip()
-        
-        # Set the Name field
         if record.get("Applicant Name") and not pd.isna(record.get("Applicant Name")):
             formatted_record["Name"] = str(record["Applicant Name"]).strip()
         elif record.get("Lead_Name") and not pd.isna(record.get("Lead_Name")):
@@ -477,7 +501,10 @@ class ZohoCRMAutomatedAuth:
             formatted_record["Name"] = str(record["Company_Name"]).strip()
         else:
             formatted_record["Name"] = f"Record_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        
+        if "No_of_bathrooms" in formatted_record:
+            print(f"📊 Record '{formatted_record.get('Name')}' - Bathrooms: {formatted_record['No_of_bathrooms']} (type: {type(formatted_record['No_of_bathrooms']).__name__})")
+        else:
+            print(f"⚠️ WARNING: No_of_bathrooms missing from formatted record!")
         return formatted_record
 
     def push_records_to_zoho(self, records, batch_size=100):
@@ -597,37 +624,3 @@ class ZohoCRMAutomatedAuth:
         except Exception as e:
             print(f"Error getting module fields: {e}")
             return False
-        
-# helper.py
-def excel_to_json(file_path: str):
-    try:
-        df = pd.read_excel(file_path)
-        records = df.to_dict(orient="records")
-        cleaned_records = []
-        for record in records:
-            cleaned_record = {} 
-            for key, value in record.items():
-                if pd.notna(value):
-                    cleaned_record[key] = value
-            cleaned_records.append(cleaned_record)       
-        if cleaned_records:
-            sample_record = cleaned_records[0]
-            crm_columns = [
-                "Email ID", "Mobile No.", "Date of permit", "Site Address",
-                "Applicant Name", "Nature of Development", "Dwelling Unit Info","Area Name", 
-                "Sales Person", "Lead_Name", "Reference", "No_of_bathrooms", 
-                "Company_Name", "Architect Name", "Planning Permission No.", 
-                "Applicant Address", "Future_Projects", "Creation_Time", 
-                "Which_Brand_Looking_for", "How_Much_Square_Feet"
-            ]
-            print("\n🔍 CRM Column Check:")
-            for crm_col in crm_columns:
-                if crm_col in sample_record:
-                    print(f"✅ {crm_col}: Found in Excel")
-                else:
-                    print(f"❌ {crm_col}: Missing from Excel")
-        return cleaned_records        
-
-    except Exception as e:
-        print(f"Error in excel_to_json: {str(e)}")
-        return []
