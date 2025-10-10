@@ -508,7 +508,6 @@ class ZohoCRMAutomatedAuth:
         return formatted_record
 
     def push_records_to_zoho(self, records, batch_size=100):
-        """Push records to Zoho CRM in batches"""
         if not self.ensure_valid_token():
             print("Failed to ensure valid token")
             return False
@@ -517,8 +516,7 @@ class ZohoCRMAutomatedAuth:
             return True 
         total_records = len(records)
         successful_records = 0
-        failed_records = 0
-        
+        failed_records = 0        
         for i in range(0, total_records, batch_size):
             batch = records[i:i + batch_size]
             formatted_batch = []
@@ -527,10 +525,7 @@ class ZohoCRMAutomatedAuth:
                 if formatted_record:
                     formatted_batch.append(formatted_record)
             if not formatted_batch:
-                continue
-
-            print(json.dumps({'data': formatted_batch}, indent=2))
-            
+                continue            
             url = f"{self.api_base_url}/{self.zoho_model_name}"
             headers = {
                 'Authorization': f'Zoho-oauthtoken {self.access_token}',
@@ -584,7 +579,6 @@ class ZohoCRMAutomatedAuth:
             if response.status_code == 200:
                 modules = response.json()
                 module_names = [module['api_name'] for module in modules.get('modules', [])]
-                print(f"Available modules: {module_names}")
                 if self.zoho_model_name in module_names:
                     print(f"✅ Model '{self.zoho_model_name}' found!")
                     return True
