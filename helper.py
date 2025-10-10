@@ -154,8 +154,7 @@ def send_unmatched_areas_alert(unmatched_df: pd.DataFrame, original_file_name: s
 def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'Area Name',sales_person_column_name: str = 'Sales Person',sheet_name: str = None,fuzzy_match_threshold: int = 100) -> dict:
     
     SALES_PERSON_AREAS = {
-        # Adambakkam
-        "Abhishek": ["Alandur", "Alandur Guindy", "Guindy", "Madipakkam", 
+        "Abhishek": ["Adambakkam","Alandur", "Alandur Guindy", "Guindy", "Madipakkam", 
             "Medavakkam", "Nanganallur", "Pallikaranai", "Thalakananchery", 
             "Thalakkanancheri", "Thalakkananchery", "Thalakkancheri", "Velachery"
         ],
