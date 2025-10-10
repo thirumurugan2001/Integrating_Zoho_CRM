@@ -142,7 +142,6 @@ def send_unmatched_areas_alert(unmatched_df: pd.DataFrame, original_file_name: s
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender_mailId, passKey)
             server.sendmail(sender_mailId, recipient_email, msg.as_string())
-        print(f"✅ Alert email sent successfully to {recipient_email}")
         try:
             os.unlink(temp_file_path)
         except:

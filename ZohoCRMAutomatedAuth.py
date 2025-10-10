@@ -17,7 +17,6 @@ import traceback
 from dotenv import load_dotenv
 load_dotenv()
 
-
 class ZohoCRMAutomatedAuth: 
 
     def __init__(self):
@@ -431,18 +430,13 @@ class ZohoCRMAutomatedAuth:
                             dwelling_value = int(numbers[0])
                             bathrooms = dwelling_value * 2
                             formatted_record["No_of_bathrooms"] = str(bathrooms)
-                            print(f"✅ Calculated bathrooms: {dwelling_value} units × 2 = {bathrooms} bathrooms")
                         else:
-                            print(f"⚠️ No numeric value found in dwelling units '{dwelling_str}'")
                             formatted_record["No_of_bathrooms"] = "0"
                     except (ValueError, TypeError) as e:
-                        print(f"⚠️ Could not extract number from dwelling units '{dwelling_str}': {e}")
                         formatted_record["No_of_bathrooms"] = "0"
                 else:
-                    print(f"⚠️ Dwelling Unit Info is empty or invalid")
                     formatted_record["No_of_bathrooms"] = "0"
             else:
-                print(f"⚠️ Dwelling Unit Info is None or NaN")
                 formatted_record["No_of_bathrooms"] = "0"
         except Exception as e:
             print(f"❌ Error calculating bathrooms: {e}")
@@ -502,7 +496,7 @@ class ZohoCRMAutomatedAuth:
         else:
             formatted_record["Name"] = f"Record_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         if "No_of_bathrooms" in formatted_record:
-            print(f"📊 Record '{formatted_record.get('Name')}' - Bathrooms: {formatted_record['No_of_bathrooms']} (type: {type(formatted_record['No_of_bathrooms']).__name__})")
+            pass
         else:
             print(f"⚠️ WARNING: No_of_bathrooms missing from formatted record!")
         return formatted_record
@@ -580,7 +574,6 @@ class ZohoCRMAutomatedAuth:
                 modules = response.json()
                 module_names = [module['api_name'] for module in modules.get('modules', [])]
                 if self.zoho_model_name in module_names:
-                    print(f"✅ Model '{self.zoho_model_name}' found!")
                     return True
                 else:
                     print(f"❌ Model '{self.zoho_model_name}' not found in available modules")
