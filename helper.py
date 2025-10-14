@@ -10,27 +10,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
-def separate_and_store_temp(filepath):
-    keywords = ["school building", "hospital", "college", "inst", "kalayaan mandapam"]
-    try:
-        df = pd.read_excel(filepath)        
-        required_cols = ["Dwelling Unit Info", "Nature of Development"]
-        for col in required_cols:
-            if col not in df.columns:
-                raise ValueError(f"Missing required column: {col}")        
-        cond1 = df["Dwelling Unit Info"].notna() & (df["Dwelling Unit Info"].astype(str).str.strip() != "")        
-        cond2 = df["Dwelling Unit Info"].isna() | (df["Dwelling Unit Info"].astype(str).str.strip() == "")
-        cond2 = cond2 & df["Nature of Development"].astype(str).str.lower().apply(
-            lambda x: any(k in x for k in keywords))        
-        filtered_df = df[cond1 | cond2]        
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-        filtered_df.to_excel(temp_file.name, index=False)
-        print(f"✅ Filtered data saved to: {temp_file.name}")
-        return temp_file.name
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        return None
-
 def excel_to_json(file_path: str):
     try:
         df = pd.read_excel(file_path)
@@ -185,7 +164,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             "Selaiyur", "Sirukalathur", "Tambaram", "Thirumudivakkam", 
             "Thiruneermalai", "Thiruvancheri", "Vandalur", "Varadarajapuram", 
             "Varadharajapuram", "Vengaivasal", "Vengambakkam", 
-            "Ward No.C of Tambaram", "Ward No.D of Tambaram"
+            "Ward No.C of Tambaram", "Tambaram"
         ],
         "Dinikaran": [
             "Kottivakkam", "Kovilambakkam", "Neelangarai", "Okkiam Thoraipakkam", 
@@ -214,7 +193,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             "Thiruninravur", "Thiruninravur-A", "Thiruninravur-B", "Thiruvotriyur", 
             "Tondairpet", "Tondiarpet", "Vanagaram", "Vayalanallur", "Vayalanallur-A", 
             "Veeraragavapuram", "Veeraraghavapuram", "Venkatapuram", 
-            "Vilangadupakkam", "Villivakkam", "Ward No. I of Paruthipattu"
+            "Vilangadupakkam", "Villivakkam", "Paruthipattu"
         ],
         "Karthik / Ventakesh": [
             "Gerugambakkam", "Kollacheri", "Kulappakkam", "Kuthambakkam", 
@@ -223,7 +202,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             "Arasankalani", "Arasankazhani"
         ],
         "Jagan / Karthik": [
-            "Mylapore", "T. Nagar", "T.Nagar"
+            "Mylapore", "T Nagar", "T.Nagar"
         ],
         "Ventakesh / Dinikaran": [
             "Part Kottivakkam", "Semmancheri", "Semmanchery"
@@ -343,3 +322,148 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
     except Exception as e:
         print(f"❌ Error processing Excel file: {str(e)}")
         raise e
+    
+def send_unmatched_records_alert(unmatched_df: pd.DataFrame, original_file_name: str = "input_file.xlsx") -> bool:
+    try:
+        sender_mailId = os.getenv("SENDER_MAIL", "riverpearlsolutions@gmail.com")
+        passKey = os.getenv("APP_PASSWORD", "gwvcgbvjvttpvlja")
+        recipient_email = os.getenv("RECIPIENT_MAIL")
+        if not sender_mailId or not passKey:
+            print("Error: Email credentials not found")
+            return False
+        if not recipient_email:
+            print("Error: Recipient email not found")
+            return False
+        if unmatched_df.empty:
+            print("No unmatched records to report")
+            return True
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx", mode='wb')
+        unmatched_df.to_excel(temp_file.name, index=False)
+        temp_file_path = temp_file.name
+        temp_file.close()
+        attachment_filename = f"Unmatched_Records_{timestamp}.xlsx"
+        msg = MIMEMultipart()
+        msg['From'] = sender_mailId
+        msg['To'] = recipient_email
+        msg['Subject'] = f"Alert: Unmatched Records Found - Based on the Dwelling Unit Info and Nature of Development"
+        total_unmatched = len(unmatched_df)
+        body = f'''
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background-color: #ff6b6b; color: white; padding: 15px; border-radius: 5px;">
+                    <h2 style="margin: 0;">⚠️ Unmatched Records Alert </h2>
+                </div>
+                
+                <div style="padding: 20px; background-color: #f9f9f9; margin-top: 20px; border-radius: 5px;">
+                    <p>Dear Team,</p>
+                    <p>The system has identified records that do not meet the required criteria during the processing of <strong>{original_file_name}</strong>.</p>
+                    
+                    <div style="background-color: white; padding: 15px; border-left: 4px solid #ff6b6b; margin: 20px 0;">
+                        <h3 style="margin-top: 0; color: #ff6b6b;">Summary</h3>
+                        <ul style="list-style: none; padding: 0;">
+                            <li>📊 <strong>Total Unmatched Rec ords:</strong> {total_unmatched}</li>
+                            <li>📅 <strong>Generated On:</strong> {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</li>
+                            <li>📁 <strong>Source File:</strong> {original_file_name}</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                        <h4 style="margin-top: 0; color: #856404;">Matching Criteria:</h4>
+                        <p style="margin: 5px 0;">Records are considered <strong>matched</strong> if:</p>
+                        <ol style="margin: 10px 0;">
+                            <li><strong>Dwelling Unit Info</strong> is not empty/null, OR</li>
+                            <li><strong>Nature of Development</strong> contains keywords: school building, hospital, college, inst, kalayaan mandapam</li>
+                        </ol>
+                        <p style="color: #856404; font-style: italic;">Unmatched records do not meet either of these conditions.</p>
+                    </div>
+                    
+                    <p><strong>Action Required:</strong></p>
+                    <ol>
+                        <li>Review the attached Excel file containing all unmatched records</li>
+                        <li>Verify if "Dwelling Unit Info" should be populated for these records</li>
+                        <li>Check if "Nature of Development" should contain relevant keywords</li>
+                        <li>Update the records and reprocess the file if needed</li>
+                    </ol>
+                    
+                    <p>The complete unmatched records data is attached to this email for your review and action.</p>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+                
+                <div style="font-size: 12px; color: #666;">
+                    <p><strong>VPEARL SOLUTIONS - An AI Company, Chennai</strong></p>
+                    <p>
+                        🌐 <a href="https://vpearlsolutions.com/" target="_blank" style="color: #4a90e2;">Website</a> | 
+                        🔗 <a href="https://www.linkedin.com/company/vpealsoutions/" target="_blank" style="color: #4a90e2;">LinkedIn</a> | 
+                        📷 <a href="https://www.instagram.com/vpearl_solutions" target="_blank" style="color: #4a90e2;">Instagram</a> | 
+                        📘 <a href="https://www.facebook.com/profile.php?id=61572978223085" target="_blank" style="color: #4a90e2;">Facebook</a>
+                    </p>
+                    <p style="font-size: 10px; color: #999;">
+                        <em>This is an automated alert. Please do not reply to this email.</em>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        '''
+        
+        msg.attach(MIMEText(body, 'html'))        
+        if os.path.exists(temp_file_path):
+            with open(temp_file_path, 'rb') as f:
+                attachment = MIMEApplication(f.read(), _subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                attachment.add_header('Content-Disposition', 'attachment', filename=attachment_filename)
+                msg.attach(attachment)
+        else:
+            print(f"Error: Temporary file not found at {temp_file_path}")
+            return False        
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(sender_mailId, passKey)
+            server.sendmail(sender_mailId, recipient_email, msg.as_string())
+        print(f"✅ Email alert sent successfully to {recipient_email}")
+        try:
+            os.unlink(temp_file_path)
+        except:
+            pass
+        return True
+    except Exception as e:
+        print(f"❌ Error in send_unmatched_records_alert function: {str(e)}")
+        return False
+
+def separate_and_store_temp(filepath, send_email=True):
+    keywords = ["school building", "hospital", "college", "inst", "kalayaan mandapam"]
+    try:
+        df = pd.read_excel(filepath)        
+        original_file_name = os.path.basename(filepath)
+        required_cols = ["Dwelling Unit Info", "Nature of Development"]
+        for col in required_cols:
+            if col not in df.columns:
+                raise ValueError(f"Missing required column: {col}")        
+        cond1 = df["Dwelling Unit Info"].notna() & (df["Dwelling Unit Info"].astype(str).str.strip() != "")
+        cond2 = df["Dwelling Unit Info"].isna() | (df["Dwelling Unit Info"].astype(str).str.strip() == "")
+        cond2 = cond2 & df["Nature of Development"].astype(str).str.lower().apply(
+            lambda x: any(k in x for k in keywords))
+        matched_df = df[cond1 | cond2]
+        unmatched_df = df[~(cond1 | cond2)]
+        matched_temp_file = tempfile.NamedTemporaryFile(delete=False, suffix="_matched.xlsx")
+        matched_df.to_excel(matched_temp_file.name, index=False)
+        print(f"✅ Matched data saved to: {matched_temp_file.name}")
+        print(f"   Total matched records: {len(matched_df)}")        
+        unmatched_temp_file = tempfile.NamedTemporaryFile(delete=False, suffix="_unmatched.xlsx")
+        unmatched_df.to_excel(unmatched_temp_file.name, index=False)
+        print(f"✅ Unmatched data saved to: {unmatched_temp_file.name}")
+        print(f"   Total unmatched records: {len(unmatched_df)}")        
+        if send_email and not unmatched_df.empty:
+            print("\n📧 Sending email alert for unmatched records...")
+            email_sent = send_unmatched_records_alert(unmatched_df, original_file_name)
+            if email_sent:
+                print("✅ Email alert sent successfully!")
+            else:
+                print("⚠️ Failed to send email alert")
+        elif unmatched_df.empty:
+            print("\n✅ No unmatched records found - no email sent")
+        return matched_temp_file.name
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return None
