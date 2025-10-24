@@ -476,7 +476,7 @@ def send_records_alert(matched_df: pd.DataFrame, unmatched_df: pd.DataFrame, ori
 
 
 def separate_and_store_temp(filepath, send_email=True):
-    keywords = ["school building", "hospital", "college", "inst", "kalayaan mandapam"]
+    keywords = ["premium fsi","units","mall","theatre building","screens","dwelling units","dwellings","school building", "hospital", "college", "inst", "kalyana mandapam","auditorium","service apartment","service apartments"]
     try:
         df = pd.read_excel(filepath)
         original_file_name = os.path.basename(filepath)
@@ -484,10 +484,10 @@ def separate_and_store_temp(filepath, send_email=True):
         for col in required_cols:
             if col not in df.columns:
                 raise ValueError(f"Missing required column: {col}")        
-        cond1 = df["Dwelling Unit Info"].notna() & (df["Dwelling Unit Info"].astype(str).str.strip() != "")        
+        cond1 = df["Dwelling Unit Info"].notna() & (df["Dwelling Unit Info"].astype(str).str.strip() != "")                
+        nature_lower = df["Nature of Development"].astype(str).str.lower().str.strip()
         cond2 = df["Dwelling Unit Info"].isna() | (df["Dwelling Unit Info"].astype(str).str.strip() == "")
-        cond2 = cond2 & df["Nature of Development"].astype(str).str.lower().apply(
-            lambda x: any(k in x for k in keywords))        
+        cond2 = cond2 & nature_lower.apply(lambda x: any(k in x for k in keywords))
         matched_df = df[cond1 | cond2]
         unmatched_df = df[~(cond1 | cond2)]        
         matched_temp_file = tempfile.NamedTemporaryFile(delete=False, suffix="_matched.xlsx")
