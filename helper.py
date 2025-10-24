@@ -474,7 +474,6 @@ def send_records_alert(matched_df: pd.DataFrame, unmatched_df: pd.DataFrame, ori
         print(f"❌ Error in send_records_alert function: {str(e)}")
         return False
 
-
 def separate_and_store_temp(filepath, send_email=True):
     keywords = ["premium fsi","units","mall","theatre building","screens","dwelling units","dwellings","school building", "hospital", "college", "inst", "kalyana mandapam","auditorium","service apartment","service apartments"]
     try:
