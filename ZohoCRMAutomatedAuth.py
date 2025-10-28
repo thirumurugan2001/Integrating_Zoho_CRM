@@ -573,6 +573,7 @@ class ZohoCRMAutomatedAuth:
             if response.status_code == 200:
                 modules = response.json()
                 module_names = [module['api_name'] for module in modules.get('modules', [])]
+                print(f"Available modules: {module_names}")
                 if self.zoho_model_name in module_names:
                     return True
                 else:

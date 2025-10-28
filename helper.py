@@ -141,8 +141,8 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             "Adyar", "Athipattu", "Egmore", "Kottur", "Koyambedu", "koyambedu", 
             "Koyembedu", "Mogappair", "Mullam", "Naduvakarai", "Naduvankarai", 
             "Naduvankkarai", "Nekundram", "Nerkundram", "Nolambur", "Nungambakkam", 
-            "Pallipattu", "Part of Thirumangalam", "Periyakudal", 
-            "Secretariat Colony Kilpauk Chennai.", "Urur", "Vada Agaram", "Vepery"
+            "Pallipattu", "Part of Thirumangalam", "Periyakudal", "Alwarpet",
+            "Secretariat Colony Kilpauk Chennai.", "Urur", "Vada Agaram", "Vepery","Aminjikarai"
         ],
         "Karthik": [
             "Arumbakkam", "Ayyappanthangal", "Ekkaduthangal", "Goparasanallur", 

@@ -8,7 +8,7 @@ def lead_import(file_path):
             crm.get_module_fields()
             file_path = separate_and_store_temp(file_path,True)
             temp_path = assign_sales_person_to_areas(excel_file_path=file_path,area_column_name="Area Name", sales_person_column_name="Sales Person")
-            records = excel_to_json(temp_path)   
+            records = excel_to_json(temp_path)
             if records:
                 success = crm.push_records_to_zoho(records)
                 if success:
