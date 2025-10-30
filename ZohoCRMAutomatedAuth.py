@@ -1142,7 +1142,7 @@ class ZohoCRMAutomatedAuth:
         else:
             print(f"⚠️ WARNING: No_of_bathrooms missing from formatted record!")
         
-        formatted_record['Lead_Source'] = "Website"
+        formatted_record['Lead_Source'] = "Digital Leads"
         return formatted_record
 
     def push_records_to_zoho(self, records, batch_size=100):
@@ -1215,7 +1215,7 @@ class ZohoCRMAutomatedAuth:
             "Last_Name": cmda_record.get("Lead_Name", cmda_record.get("Applicant Name", "")),
             "Email": cmda_record.get("Email", ""),
             "Phone": cmda_record.get("Mobile_Number", ""),
-            "Lead_Source": "Website",
+            "Lead_Source": "Digital Leads",
             "Description": f"CMDA Record - {cmda_record.get('Nature_of_Developments', '')}",
             "City": cmda_record.get("Area_Name", ""),
             "Street": cmda_record.get("Site_Address", "")

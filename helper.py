@@ -510,62 +510,24 @@ def separate_and_store_temp(filepath, send_email=True):
         print(f"❌ Error: {e}")
         return None
     
-# Add this function to your Helper.py file
 
-def process_and_push_to_zoho(file_path, zoho_auth):
-    """
-    Process Excel file and push to Zoho CRM with proper sales person assignment
-    """
-    try:
-        # Step 1: Assign sales persons to areas
-        print("🔧 Step 1: Assigning sales persons to areas...")
-        matched_file_path = assign_sales_person_to_areas(file_path)
-        
-        if not matched_file_path:
-            print("❌ Failed to assign sales persons")
-            return False
-        
-        # Step 2: Separate matched records
-        print("🔧 Step 2: Separating matched records...")
-        final_matched_file = separate_and_store_temp(matched_file_path, send_email=False)
-        
-        if not final_matched_file:
-            print("❌ Failed to separate matched records")
-            return False
-        
-        # Step 3: Read and process records for Zoho
-        print("🔧 Step 3: Processing records for Zoho CRM...")
-        df = pd.read_excel(final_matched_file)
+def assgin_leads_to_lead_name(file_path, zoho_auth):
+    try:                       
+        df = pd.read_excel(file_path)
         records = df.to_dict('records')
-        
-        print(f"📊 Total records to push: {len(records)}")
-        
-        # Step 4: Push to Zoho CRM
-        print("🔧 Step 4: Pushing records to Zoho CRM...")
-        success = zoho_auth.push_records_to_zoho(records)
-        
-        # Step 5: Optional - Create Leads from CMDA records
-        print("🔧 Step 5: Creating Leads from CMDA records...")
+        print("Creating Leads from CMDA records...")
         leads_created = 0
         for record in records:
             if zoho_auth.create_lead_from_cmda_record(record):
-                leads_created += 1
-        
+                leads_created += 1        
         print(f"\n🎯 Final Results:")
         print(f"   - CMDA Records Pushed: {len(records)}")
-        print(f"   - Leads Created: {leads_created}")
-        
-        # Clean up temporary files
+        print(f"   - Leads Created: {leads_created}")        
         try:
-            os.unlink(matched_file_path)
-            os.unlink(final_matched_file)
+            os.unlink(file_path)
         except:
             pass
-            
-        return success
-        
+        return True
     except Exception as e:
         print(f"❌ Error in process_and_push_to_zoho: {e}")
-        import traceback
-        traceback.print_exc()
         return False

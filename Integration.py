@@ -1,26 +1,39 @@
 # Integration.py
 from ZohoCRMAutomatedAuth import ZohoCRMAutomatedAuth
-from helper import excel_to_json,assign_sales_person_to_areas,separate_and_store_temp
+from helper import excel_to_json, assign_sales_person_to_areas, separate_and_store_temp, assgin_leads_to_lead_name
 
 def lead_import(file_path):
-    try : 
+    try: 
         crm = ZohoCRMAutomatedAuth()    
         if crm.test_api_connection():
-            crm.get_module_fields()
-            file_path = separate_and_store_temp(file_path,True)
-            temp_path = assign_sales_person_to_areas(excel_file_path=file_path,area_column_name="Area Name", sales_person_column_name="Sales Person")
+            crm.get_module_fields()      
+            file_path = separate_and_store_temp(file_path, True)            
+            temp_path = assign_sales_person_to_areas(
+                excel_file_path=file_path,
+                area_column_name="Area Name", 
+                sales_person_column_name="Sales Person"
+            )            
             records = excel_to_json(temp_path)
-            if records:
-                success = crm.push_records_to_zoho(records)
-                if success:
-                    return {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
-                        "message": "Records pushed successfully!",
+            if records: 
+                print(f"Pushing {len(records)} records to CMDA model...")
+                cmda_success = crm.push_records_to_zoho(records)
+                print(f"Creating Leads from {len(records)} CMDA records...")
+                leads_success = assgin_leads_to_lead_name(temp_path, crm)                
+                if cmda_success and leads_success:
+                    return {
+                        "message": "Records pushed to CMDA and Leads created successfully!",
                         "statusCode": 200,
                         "status": True,
                     }
                 else:
+                    error_msg = []
+                    if not cmda_success:
+                        error_msg.append("Failed to push some CMDA records")
+                    if not leads_success:
+                        error_msg.append("Failed to create some Leads")
+                    
                     return {
-                        "message": "Failed to push some or all records",
+                        "message": "; ".join(error_msg),
                         "statusCode": 400,  
                         "status": False,
                     }
@@ -32,11 +45,11 @@ def lead_import(file_path):
                 }
         else:
             return {
-                    "message": "API connection failed!",
-                    "statusCode": 400,  
-                    "status": False,
-                    "data": [{}]
-                }
+                "message": "API connection failed!",
+                "statusCode": 400,  
+                "status": False,
+                "data": [{}]
+            }
     except Exception as e:
         return {
             "message": str(e),
@@ -44,3 +57,6 @@ def lead_import(file_path):
             "status": False,
             "data": [{}]
         }
+
+
+
