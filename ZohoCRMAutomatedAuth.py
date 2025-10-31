@@ -459,40 +459,6 @@ class ZohoCRMAutomatedAuth:
         print(f"\n✅ Push completed: {successful_records} successful, {failed_records} failed out of {total_records} total")
         return successful_records > 0
 
-    def create_lead_from_cmda_record(self, cmda_record):
-        if not self.ensure_valid_token():
-            return False        
-        lead_data = {
-            "Company": cmda_record.get("Company_Name", ""),
-            "Last_Name": cmda_record.get("Lead_Name", cmda_record.get("Applicant Name", "")),
-            "Email": cmda_record.get("Email", ""),
-            "Phone": cmda_record.get("Mobile_Number", ""),
-            "Lead_Source": "Digital Leads",
-            "Description": f"CMDA Record - {cmda_record.get('Nature_of_Developments', '')}",
-            "City": cmda_record.get("Area_Name", ""),
-            "Street": cmda_record.get("Site_Address", "")
-        }        
-        if "Sales Person" in cmda_record and cmda_record["Sales Person"]:
-            sales_person = cmda_record["Sales Person"]
-            user_id = self.get_user_id_by_name(sales_person)
-            if user_id:
-                lead_data["Lead_Owner"] = user_id
-                print(f"✅ Assigned Lead Owner: {sales_person}")        
-        url = f"{self.api_base_url}/Leads"
-        headers = {'Authorization': f'Zoho-oauthtoken {self.access_token}','Content-Type': 'application/json'}
-        payload = {'data': [lead_data],'trigger': ['workflow']}
-        try:
-            response = requests.post(url, json=payload, headers=headers)
-            if response.status_code == 201:
-                print("✅ Lead created successfully from CMDA record")
-                return True
-            else:
-                print(f"❌ Failed to create Lead: {response.status_code} - {response.text}")
-                return False
-        except Exception as e:
-            print(f"❌ Error creating Lead: {e}")
-            return False
-      
     def test_api_connection(self):
         if not self.ensure_valid_token():
             return False
@@ -526,3 +492,286 @@ class ZohoCRMAutomatedAuth:
                 return False
         except Exception as e:
             return False
+    
+    def create_lead_from_cmda_record(self, cmda_record):
+        print("🔄 Creating Lead in Zoho CRM from CMDA record...", cmda_record)
+        
+        if not self.ensure_valid_token():
+            print("❌ Cannot authenticate with Zoho CRM")
+            return False
+        
+        # Build comprehensive lead data with all available fields
+        lead_data = {
+            # Basic Contact Information
+            "Company": self.clean_value(cmda_record.get("Company_Name", "")),
+            "Last_Name": self.clean_value(cmda_record.get("Applicant Name", "Unknown Applicant")),  # MANDATORY FIELD
+            "Email": self.clean_value(cmda_record.get("Email ID", "")),
+            "Phone": self.clean_value(cmda_record.get("Mobile No.", "")),
+            "First_Name": self.extract_first_name(cmda_record.get("Applicant Name", "")),
+            
+            # Address Information
+            "Billing_Area": self.clean_value(cmda_record.get("Area Name", "")),
+            "Street": self.clean_value(cmda_record.get("Applicant Address", cmda_record.get("Site Address", ""))),
+            "City": "Chennai",  # Default based on your data
+            "State": "Tamil Nadu",  # Default based on your data
+            "Country": "India",  # Default based on your data
+            
+            # Project Details
+            "Project_Name": self.clean_value(cmda_record.get("Company_Name", "")),
+            "How_Much_Square_Feet": self.clean_value(cmda_record.get("How_Much_Square_Feet", "")),
+            "Site_Area": self.clean_value(cmda_record.get("Site_Area", "")),
+            "Reference": self.clean_value(cmda_record.get("Reference", "")),
+            "Architect_Name": self.clean_value(cmda_record.get("Architect Name", "")),
+            
+            # CMDA Specific Information
+            "Description": self.build_description(cmda_record),
+            "Lead_Source": "Digital Leads",
+            "Future_Projects": self.clean_value(cmda_record.get("Future_Projects", "-None-")),
+            
+            # Planning Permission Details
+            "Planning_Permission_No": self.clean_value(cmda_record.get("Planning Permission No.", "")),
+            "Permit_No": self.clean_value(cmda_record.get("Permit No.", "")),
+            "File_No": self.clean_value(cmda_record.get("File No.", "")),
+        }
+        
+        # Handle numeric fields
+        self.handle_numeric_fields(lead_data, cmda_record)
+        
+        # Handle multi-select picklist fields
+        self.handle_picklist_fields(lead_data, cmda_record)
+        
+        # Handle date fields
+        self.handle_date_fields(lead_data, cmda_record)
+        
+        # Handle Sales Person assignment
+        self.handle_sales_person_assignment(lead_data, cmda_record)
+        
+        # Clean the data - be less aggressive
+        lead_data = self.final_data_cleaning(lead_data)
+        
+        print(f"📤 Sending Complete Lead data to Zoho CRM:")
+        for key, value in lead_data.items():
+            print(f"   {key}: {value}")
+        
+        url = f"{self.api_base_url}/Leads"
+        headers = {
+            'Authorization': f'Zoho-oauthtoken {self.access_token}',
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            'data': [lead_data],
+            'trigger': ['workflow']
+        }
+        
+        try:
+            response = requests.post(url, json=payload, headers=headers)
+            print(f"📨 Zoho CRM Response Status: {response.status_code}")
+            
+            if response.status_code == 201:
+                result = response.json()
+                print("✅ Lead created successfully in Zoho CRM!")
+                if 'data' in result:
+                    for item in result['data']:
+                        if item.get('status') == 'success':
+                            lead_id = item.get('details', {}).get('id', 'Unknown')
+                            print(f"🎉 Lead Created Successfully! ID: {lead_id}")
+                            # Print all returned data
+                            print(f"📋 Complete Response: {item}")
+                        else:
+                            error_msg = item.get('message', 'Unknown error')
+                            error_details = item.get('details', 'No details')
+                            print(f"❌ Lead creation failed: {error_msg}")
+                            print(f"🔍 Error Details: {error_details}")
+                return True
+            else:
+                print(f"❌ Failed to create Lead. Status: {response.status_code}")
+                print(f"🔍 Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error creating Lead in Zoho CRM: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def clean_value(self, value):
+        """Clean value without being too aggressive"""
+        if value is None or pd.isna(value):
+            return ""
+        
+        value_str = str(value).strip()
+        if value_str.lower() in ['', 'nan', 'none', 'null']:
+            return ""
+        
+        return value_str
+
+    def extract_first_name(self, applicant_name):
+        """Extract first name from applicant name"""
+        if not applicant_name or pd.isna(applicant_name):
+            return ""
+        
+        name_parts = str(applicant_name).split()
+        if name_parts:
+            # Try to find a person's name in the company string
+            for part in name_parts:
+                if part.istitle() and len(part) > 2 and not part.isupper():
+                    return part
+            
+            # If no clear first name found, use first word
+            return name_parts[0]
+        
+        return ""
+
+    def build_description(self, cmda_record):
+        """Build comprehensive description from CMDA record"""
+        description_parts = []
+        
+        # Nature of Development
+        nature = cmda_record.get("Nature of Development", "")
+        if nature and not pd.isna(nature):
+            description_parts.append(f"Nature: {nature}")
+        
+        # Site Address
+        site_address = cmda_record.get("Site Address", "")
+        if site_address and not pd.isna(site_address):
+            description_parts.append(f"Site: {site_address}")
+        
+        # Applicant Address
+        applicant_address = cmda_record.get("Applicant Address", "")
+        if applicant_address and not pd.isna(applicant_address):
+            description_parts.append(f"Applicant Address: {applicant_address}")
+        
+        # File and Permit info
+        file_no = cmda_record.get("File No.", "")
+        permit_no = cmda_record.get("Permit No.", "")
+        planning_no = cmda_record.get("Planning Permission No.", "")
+        
+        if file_no and not pd.isna(file_no):
+            description_parts.append(f"File: {file_no}")
+        if permit_no and not pd.isna(permit_no):
+            description_parts.append(f"Permit: {permit_no}")
+        if planning_no and not pd.isna(planning_no):
+            description_parts.append(f"Planning: {planning_no}")
+        
+        # Date of Application
+        app_date = cmda_record.get("Date of Application", "")
+        if app_date and not pd.isna(app_date):
+            description_parts.append(f"Application Date: {app_date}")
+        
+        return " | ".join(description_parts) if description_parts else "CMDA Record"
+
+    def handle_numeric_fields(self, lead_data, cmda_record):
+        """Handle all numeric field conversions"""
+        try:
+            # No_of_Bathrooms calculation from Dwelling Unit Info
+            dwelling_units = cmda_record.get("Dwelling Unit Info", "0")
+            if dwelling_units and self.clean_value(dwelling_units):
+                numbers = re.findall(r'\d+', str(dwelling_units))
+                if numbers:
+                    dwelling_value = int(numbers[0])
+                    lead_data["No_of_Bathrooms"] = dwelling_value * 2  # 2 bathrooms per unit
+                else:
+                    lead_data["No_of_Bathrooms"] = 0
+            else:
+                lead_data["No_of_Bathrooms"] = 0
+        except (ValueError, TypeError) as e:
+            lead_data["No_of_Bathrooms"] = 0
+        
+        try:
+            # No_of_Units from Dwelling Unit Info
+            dwelling_units = cmda_record.get("Dwelling Unit Info", "0")
+            if dwelling_units and self.clean_value(dwelling_units):
+                numbers = re.findall(r'\d+', str(dwelling_units))
+                if numbers:
+                    lead_data["No_of_Units"] = int(numbers[0])
+                else:
+                    lead_data["No_of_Units"] = 0
+            else:
+                lead_data["No_of_Units"] = 0
+        except (ValueError, TypeError) as e:
+            lead_data["No_of_Units"] = 0
+
+    def handle_picklist_fields(self, lead_data, cmda_record):
+        """Handle picklist and multi-select fields"""
+        # Which_Brand_Looking_for as multiselect picklist
+        which_brand = cmda_record.get("Which_Brand_Looking_for", "")
+        if which_brand and self.clean_value(which_brand):
+            # For multiselect picklist, ensure it's a string (Zoho will handle the array)
+            lead_data["Which_Brand_Looking_for"] = self.clean_value(which_brand)
+        
+        # Set default values for required picklists if not provided
+        if not lead_data.get("Future_Projects"):
+            lead_data["Future_Projects"] = "-None-"
+        
+        if not lead_data.get("Lead_Source"):
+            lead_data["Lead_Source"] = "Digital Leads"
+
+    def handle_date_fields(self, lead_data, cmda_record):
+        """Handle date field formatting"""
+        # Date_of_Permit
+        date_of_permit = cmda_record.get("Date of permit", "")
+        if date_of_permit and self.clean_value(date_of_permit):
+            try:
+                # Try to parse the date format "25-06-2025"
+                if isinstance(date_of_permit, str) and len(date_of_permit) == 10 and '-' in date_of_permit:
+                    dt = datetime.strptime(date_of_permit, "%d-%m-%Y")
+                    lead_data["Date_of_Permit"] = dt.strftime("%Y-%m-%d")
+                else:
+                    lead_data["Date_of_Permit"] = self.clean_value(date_of_permit)
+            except ValueError:
+                lead_data["Date_of_Permit"] = self.clean_value(date_of_permit)
+        
+        # Date of Application
+        date_of_application = cmda_record.get("Date of Application", "")
+        if date_of_application and self.clean_value(date_of_application):
+            try:
+                # Handle "22/03/2025" format
+                if isinstance(date_of_application, str) and '/' in date_of_application:
+                    dt = datetime.strptime(date_of_application, "%d/%m/%Y")
+                    lead_data["Date_of_Application"] = dt.strftime("%Y-%m-%d")
+                else:
+                    lead_data["Date_of_Application"] = self.clean_value(date_of_application)
+            except ValueError:
+                lead_data["Date_of_Application"] = self.clean_value(date_of_application)
+
+    def handle_sales_person_assignment(self, lead_data, cmda_record):
+        """Handle sales person assignment to specific owner fields"""
+        sales_person = cmda_record.get("Sales Person", "")
+        if sales_person and self.clean_value(sales_person):
+            sales_person_clean = sales_person.strip()
+            
+            # Map sales person names to their specific owner fields
+            owner_field_mapping = {
+                "Abhishek": "Ameen_Syed_Owne",
+                "Balachander": "Balachander_Owner",
+                "Dinikaran": "Dinakaran_Owner",
+                "Jagan": "Jagan_Owner",
+                "Karthik": "Karthik_Owner",
+                "Venkatesh": "Venkatesh_Owner",
+                "Ramanunjam": "Ramanunjam_Owner"
+            }
+            
+            owner_field = owner_field_mapping.get(sales_person_clean)
+            if owner_field:
+                lead_data[owner_field] = "Yes"
+                print(f"✅ Assigned {sales_person_clean} to field: {owner_field}")
+            else:
+                print(f"⚠️  No owner field mapping found for: {sales_person_clean}")
+
+    def final_data_cleaning(self, lead_data):
+        """Final data cleaning - be less aggressive"""
+        cleaned_data = {}
+        
+        for key, value in lead_data.items():
+            # Only remove truly empty values, keep zeros and other valid data
+            if value is None:
+                continue
+            if isinstance(value, str) and value.strip() == "":
+                continue
+            if pd.isna(value):
+                continue
+            
+            cleaned_data[key] = value
+        
+        return cleaned_data
+   
