@@ -1,4 +1,3 @@
-# ZohoCRMAutomatedAuth.py
 import requests
 import json
 import time
@@ -692,27 +691,18 @@ class ZohoCRMAutomatedAuth:
             lead_data["No_of_Units"] = 0
 
     def handle_picklist_fields(self, lead_data, cmda_record):
-        """Handle picklist and multi-select fields"""
-        # Which_Brand_Looking_for as multiselect picklist
         which_brand = cmda_record.get("Which_Brand_Looking_for", "")
         if which_brand and self.clean_value(which_brand):
-            # For multiselect picklist, ensure it's a string (Zoho will handle the array)
-            lead_data["Which_Brand_Looking_for"] = self.clean_value(which_brand)
-        
-        # Set default values for required picklists if not provided
+            lead_data["Which_Brand_Looking_for"] = self.clean_value(which_brand)        
         if not lead_data.get("Future_Projects"):
             lead_data["Future_Projects"] = "-None-"
-        
         if not lead_data.get("Lead_Source"):
             lead_data["Lead_Source"] = "Digital Leads"
 
     def handle_date_fields(self, lead_data, cmda_record):
-        """Handle date field formatting"""
-        # Date_of_Permit
         date_of_permit = cmda_record.get("Date of permit", "")
         if date_of_permit and self.clean_value(date_of_permit):
             try:
-                # Try to parse the date format "25-06-2025"
                 if isinstance(date_of_permit, str) and len(date_of_permit) == 10 and '-' in date_of_permit:
                     dt = datetime.strptime(date_of_permit, "%d-%m-%Y")
                     lead_data["Date_of_Permit"] = dt.strftime("%Y-%m-%d")
@@ -720,12 +710,9 @@ class ZohoCRMAutomatedAuth:
                     lead_data["Date_of_Permit"] = self.clean_value(date_of_permit)
             except ValueError:
                 lead_data["Date_of_Permit"] = self.clean_value(date_of_permit)
-        
-        # Date of Application
         date_of_application = cmda_record.get("Date of Application", "")
         if date_of_application and self.clean_value(date_of_application):
             try:
-                # Handle "22/03/2025" format
                 if isinstance(date_of_application, str) and '/' in date_of_application:
                     dt = datetime.strptime(date_of_application, "%d/%m/%Y")
                     lead_data["Date_of_Application"] = dt.strftime("%Y-%m-%d")
@@ -735,12 +722,9 @@ class ZohoCRMAutomatedAuth:
                 lead_data["Date_of_Application"] = self.clean_value(date_of_application)
 
     def handle_sales_person_assignment(self, lead_data, cmda_record):
-        """Handle sales person assignment to specific owner fields"""
         sales_person = cmda_record.get("Sales Person", "")
         if sales_person and self.clean_value(sales_person):
-            sales_person_clean = sales_person.strip()
-            
-            # Map sales person names to their specific owner fields
+            sales_person_clean = sales_person.strip()            
             owner_field_mapping = {
                 "Abhishek": "Ameen_Syed_Owne",
                 "Balachander": "Balachander_Owner",
@@ -749,8 +733,7 @@ class ZohoCRMAutomatedAuth:
                 "Karthik": "Karthik_Owner",
                 "Venkatesh": "Venkatesh_Owner",
                 "Ramanunjam": "Ramanunjam_Owner"
-            }
-            
+            }            
             owner_field = owner_field_mapping.get(sales_person_clean)
             if owner_field:
                 lead_data[owner_field] = "Yes"
@@ -759,19 +742,14 @@ class ZohoCRMAutomatedAuth:
                 print(f"⚠️  No owner field mapping found for: {sales_person_clean}")
 
     def final_data_cleaning(self, lead_data):
-        """Final data cleaning - be less aggressive"""
-        cleaned_data = {}
-        
+        cleaned_data = {}        
         for key, value in lead_data.items():
-            # Only remove truly empty values, keep zeros and other valid data
             if value is None:
                 continue
             if isinstance(value, str) and value.strip() == "":
                 continue
             if pd.isna(value):
-                continue
-            
-            cleaned_data[key] = value
-        
+                continue            
+            cleaned_data[key] = value        
         return cleaned_data
    

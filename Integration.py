@@ -1,4 +1,3 @@
-# Integration.py
 from ZohoCRMAutomatedAuth import ZohoCRMAutomatedAuth
 from helper import excel_to_json, assign_sales_person_to_areas, separate_and_store_temp, assgin_leads_to_lead_name
 
@@ -15,9 +14,7 @@ def lead_import(file_path):
             )            
             records = excel_to_json(temp_path)
             if records: 
-                print(f"Pushing {len(records)} records to CMDA model...")
                 cmda_success = crm.push_records_to_zoho(records)
-                print(f"Creating Leads from {len(records)} CMDA records...")
                 leads_success = assgin_leads_to_lead_name(temp_path, crm)                
                 if cmda_success and leads_success:
                     return {
