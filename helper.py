@@ -153,7 +153,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             "Parivakkam", "Porur", "Puliyur", "Saligramam", "Tharapakkam", 
             "Valasaravakkam", "Virugambakkam", "Voyalanallur-A"
         ],
-        "Ventakesh": [
+        "Venkatesh": [
             "Agaramthen", "Anakaputhur", "Chembarambakkam", "Cowl Bazaar", 
             "Gowrivakkam", "Karapakkam", "Kaspapuram", "Kulathuvancheri", 
             "Kundrathur", "Kundrathur - A", "Kundrathur - B", "Kundrathur-A", 
@@ -167,16 +167,13 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             "Varadharajapuram", "Vengaivasal", "Vengambakkam", 
             "Ward No.C of Tambaram", "Tambaram"
         ],
-        "Dinikaran": [
+        "Dinakaran": [
             "Kottivakkam", "Kovilambakkam", "Neelangarai", "Okkiam Thoraipakkam", 
             "Okkiyam Thoraipakkam", "part of Sholinganallur", "Perungudi", 
             "Sholinganallur", "Thiiruvanmiyur", "Thiruvanmiyur", "Thoraipakkam"
         ],
         "Balachander": [
-            "Agraharammel", "Angadu", "Layon Pullion", "Maduravoyal"
-        ],
-        "Sithalapakkam": [
-            "Sithalapakkam"
+            "Agraharammel", "Angadu", "Layon Pullion", "Maduravoyal","Sithalapakkam"
         ],
         "Jagan / Balachander": [
             "Adayalampattu", "Alamathi", "Ambathur", "Ambattur", "Arumandai", 
@@ -196,7 +193,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             "Veeraragavapuram", "Veeraraghavapuram", "Venkatapuram", 
             "Vilangadupakkam", "Villivakkam", "Paruthipattu"
         ],
-        "Karthik / Ventakesh": [
+        "Karthik / Venkatesh": [
             "Gerugambakkam", "Kollacheri", "Kulappakkam", "Kuthambakkam", 
             "Poonamallee", "Rendamkattalai", "Rendankattalai", "Sikkarayapuram", 
             "Vellavedu", "Zamin Pallavaram", "Zamin Pallvaram", "Mambalam", 
@@ -205,7 +202,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
         "Jagan / Karthik": [
             "Mylapore", "T Nagar", "T.Nagar"
         ],
-        "Ventakesh / Dinikaran": [
+        "Venkatesh / Dinikaran": [
             "Part Kottivakkam", "Semmancheri", "Semmanchery"
         ],
     }

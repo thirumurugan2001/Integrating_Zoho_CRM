@@ -288,6 +288,19 @@ class ZohoCRMAutomatedAuth:
             return self.automate_oauth_flow()
         return True
 
+    def get_user_id_by_name(self, sales_person_name):
+        if not self.ensure_valid_token():
+            return None
+        user_mapping = {
+            "Abhishek": "60037625008",
+            "Jagan": "60037625008",
+            "Karthik": "60037625008",
+            "Ventakesh": "60037625008",
+            "Dinikaran": "60037625008",
+            "Balachander": "60037625008",
+        }
+        return user_mapping.get(sales_person_name)
+
     def format_record_for_zoho(self, record):
         formatted_record = {}
         field_mapping = {
@@ -454,6 +467,7 @@ class ZohoCRMAutomatedAuth:
             if response.status_code == 200:
                 modules = response.json()
                 module_names = [module['api_name'] for module in modules.get('modules', [])]
+                print(f"Available modules: {module_names}")
                 if self.zoho_model_name in module_names:
                     return True
                 else:
@@ -463,127 +477,210 @@ class ZohoCRMAutomatedAuth:
         except Exception as e:
             return False
 
-    def get_user_id_by_name(self, sales_person_name):
-        if not self.ensure_valid_token():
-            return None        
-        user_id_mapping = {
-                    "Abhishek": "870641000000346001", 
-                    "Karthik": "8706410000387263",  
-                    "Jagan": "870641000006012",    
-                    "Dinakaran": "870641000538001",
-                    "Venkatesh": "870641000538014",
-                    "Ventakesh": "8706410000400126",
-                    "Ameen Syed": "87000000923037",
-                    "Balachander": "870641002815019",
-                    "Vijaya Kumar": "870641000051080",
-                    # "Karthik": "870641000000387263",  
-                    # "Jagan": "870641000000396012",    
-                    # "Dinakaran": "870641000000538001",
-                    # "Venkatesh": "870641000000538014",
-                    # "Ventakesh": "870641000000400126",
-                    # "Ameen Syed": "870641000000923037",
-                    # "Balachander": "870641000002815019",
-                    # "Vijaya Kumar": "870641000004151080"
-        }        
-        return user_id_mapping.get(sales_person_name)
-    
-    
-    def create_lead_from_cmda_record(self, cmda_record):
-        
+    def get_module_fields(self):
         if not self.ensure_valid_token():
             return False
-        Architect_Name = f"Architect Name : {cmda_record.get("Architect Name", "Not Found")}, Architect Address :{cmda_record.get("Architect Address", "Not Found")}, Architect Email: {cmda_record.get("Architect Email", "Not Found")}"
-        print(f"🏗️ Architect_Name raw: {Architect_Name}")
-        How_Much_Square_Feet = cmda_record.get("Dwelling Unit Info", "")
-        numbers = re.findall(r'\d+', str(How_Much_Square_Feet))
-        if numbers:
-            How_Much_Square_Feet = numbers[0]
-        else:
-            How_Much_Square_Feet = "0"
-        How_Much_Square_Feet = int(How_Much_Square_Feet)*1000
-        print(f"📐 How_Much_Square_Feet extracted: {How_Much_Square_Feet}")
-            
-        sales_person = cmda_record.get("Sales Person", "")
-        sales_person_clean = self.clean_value(sales_person)        
-        lead_source = sales_person_clean if sales_person_clean else "Digital Leads"        
-        lead_data = {
-            "Planning_Permission_No": self.clean_value(cmda_record.get("Planning Permission No.", "")),
-            "Email": self.clean_value(cmda_record.get("Email ID", "")),
-            "Phone": self.clean_value(cmda_record.get("Mobile No.", "")),
-            "Company": cmda_record.get("Applicant Name", ""),            
-            "Nature_of_Development": self.clean_value(cmda_record.get("Nature of Development", "")),            
-            "Area_Name": self.clean_value(cmda_record.get("Area Name", "")),
-            "Site_Address": self.clean_value(cmda_record.get("Site Address", "")),
-            "Reference":"Digital Lead Abhishek",
-            "Architect_Name": Architect_Name,           
-            "Architect_Phone":cmda_record.get("Architect Mobile", "No Provided"),           
-            "Lead_Source": "Digitial Leads Abhishek",
-            "How_Much_Square_Feet": str(How_Much_Square_Feet),
-
-            # other : fields can be added here as needed
-            "Last_Name": cmda_record.get("Sales Person", "")
-        }
-        
-        self.handle_numeric_fields(lead_data, cmda_record)        
-        self.handle_picklist_fields(lead_data, cmda_record)        
-        self.handle_date_fields(lead_data, cmda_record)        
-        self.handle_sales_person_assignment(lead_data, cmda_record)
-        lead_data = self.final_data_cleaning(lead_data)       
-        print(f"📤 Sending Complete Lead data to Zoho CRM:")
-        print(f"   👤 Lead Source (Sales Person): {lead_data.get('Lead_Source', 'Not set')}")
-        print(f"   🎯 Assigned Owner ID: {lead_data.get('Owner', 'Not set')}")       
-        url = f"{self.api_base_url}/Leads"
-        headers = {
-            'Authorization': f'Zoho-oauthtoken {self.access_token}',
-            'Content-Type': 'application/json'
-        }
-        payload = {
-            'data': [lead_data],
-            'trigger': ['workflow']
-        }
-        print("Data",url,payload,headers)        
+        url = f"{self.api_base_url}/settings/fields?module={self.zoho_model_name}"
+        headers = {'Authorization': f'Zoho-oauthtoken {self.access_token}','Content-Type': 'application/json'}
         try:
-            response = requests.post(url, json=payload, headers=headers)            
-            if response.status_code == 201:
-                result = response.json()
-                print("✅ Lead created successfully in Zoho CRM!")
-                if 'data' in result:
-                    for item in result['data']:
-                        if item.get('status') == 'success':
-                            lead_id = item.get('details', {}).get('id', 'Unknown')
-                            created_by = item.get('details', {}).get('Created_By', {}).get('name', 'Unknown')
-                            owner_name = item.get('details', {}).get('Owner', {}).get('name', 'Unknown')
-                            print(f"🎉 Lead Created Successfully! ID: {lead_id}")
-                            print(f"👤 Lead Source (Shows in UI): {lead_source}")
-                            print(f"🎯 Assigned To (Owner): {owner_name}")
-                            print(f"🛠️ Created By: {created_by}")
-                        else:
-                            error_msg = item.get('message', 'Unknown error')
-                            error_details = item.get('details', 'No details')
-                            print(f"❌ Lead creation failed: {error_msg}")
-                            print(f"🔍 Error Details: {error_details}")
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
                 return True
             else:
-                print(f"❌ Failed to create Lead. Status: {response.status_code}")
-                print(f"🔍 Response: {response.text}")
-                return False                
+                return False
         except Exception as e:
-            print(f"❌ Error creating Lead in Zoho CRM: {e}")
-            import traceback
-            traceback.print_exc()
             return False
+    
+def create_lead_from_cmda_record(self, cmda_record):
+    print("🔄 Creating Lead in Zoho CRM from CMDA record...", cmda_record)
+    
+    if not self.ensure_valid_token():
+        print("❌ Cannot authenticate with Zoho CRM")
+        return False
+    
+    # Get sales person name for Lead Source
+    sales_person = cmda_record.get("Sales Person", "")
+    sales_person_clean = self.clean_value(sales_person)
+    
+    # Use sales person name in Lead Source, fallback to "Digital Leads"
+    lead_source = sales_person_clean if sales_person_clean else "Digital Leads"
+    
+    lead_data = {
+        "Company": self.clean_value(cmda_record.get("Company_Name", "")),
+        "Last_Name": self.truncate_last_name(cmda_record.get("Applicant Name", "Unknown Applicant")),  # MANDATORY FIELD
+        "Email": self.clean_value(cmda_record.get("Email ID", "")),
+        "Phone": self.clean_value(cmda_record.get("Mobile No.", "")),
+        "First_Name": self.extract_first_name(cmda_record.get("Applicant Name", "")),            
+        "Billing_Area": self.clean_value(cmda_record.get("Area Name", "")),
+        "Street": self.clean_value(cmda_record.get("Applicant Address", cmda_record.get("Site Address", ""))),
+        "City": "Chennai",  
+        "State": "Tamil Nadu",
+        "Country": "India",  
+        "Project_Name": self.clean_value(cmda_record.get("Company_Name", "")),
+        "How_Much_Square_Feet": self.clean_value(cmda_record.get("How_Much_Square_Feet", "")),
+        "Site_Area": self.clean_value(cmda_record.get("Site_Area", "")),
+        "Reference": self.clean_value(cmda_record.get("Reference", "")),
+        "Architect_Name": self.clean_value(cmda_record.get("Architect Name", "")),            
+        "Description": self.build_description(cmda_record),
+        "Lead_Source": lead_source,  # Use sales person name here
+        "Future_Projects": self.clean_value(cmda_record.get("Future_Projects", "-None-")),            
+        "Planning_Permission_No": self.clean_value(cmda_record.get("Planning Permission No.", "")),
+        "Permit_No": self.clean_value(cmda_record.get("Permit No.", "")),
+        "File_No": self.clean_value(cmda_record.get("File No.", "")),
+    }
+    
+    self.handle_numeric_fields(lead_data, cmda_record)        
+    self.handle_picklist_fields(lead_data, cmda_record)        
+    self.handle_date_fields(lead_data, cmda_record)
+    
+    # Handle sales person assignment to Owner field
+    self.handle_sales_person_assignment(lead_data, cmda_record)
+    
+    lead_data = self.final_data_cleaning(lead_data)        
+    
+    print(f"📤 Sending Complete Lead data to Zoho CRM:")
+    print(f"   👤 Lead Source (Sales Person): {lead_data.get('Lead_Source', 'Not set')}")
+    print(f"   🎯 Assigned Owner: {lead_data.get('Owner', 'Not set')}")
+    for key, value in lead_data.items():
+        if key not in ['Lead_Source', 'Owner']:
+            print(f"   {key}: {value}")
+    
+    url = f"{self.api_base_url}/Leads"
+    headers = {
+        'Authorization': f'Zoho-oauthtoken {self.access_token}',
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'data': [lead_data],
+        'trigger': ['workflow']
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        print(f"📨 Zoho CRM Response Status: {response.status_code}")            
+        
+        if response.status_code == 201:
+            result = response.json()
+            print("✅ Lead created successfully in Zoho CRM!")
+            if 'data' in result:
+                for item in result['data']:
+                    if item.get('status') == 'success':
+                        lead_id = item.get('details', {}).get('id', 'Unknown')
+                        created_by = item.get('details', {}).get('Created_By', {}).get('name', 'Unknown')
+                        owner_name = item.get('details', {}).get('Owner', {}).get('name', 'Unknown')
+                        print(f"🎉 Lead Created Successfully! ID: {lead_id}")
+                        print(f"👤 Lead Source: {lead_source}")
+                        print(f"🎯 Assigned To: {owner_name} (Owner)")
+                        print(f"🛠️ Created By: {created_by}")
+                    else:
+                        error_msg = item.get('message', 'Unknown error')
+                        error_details = item.get('details', 'No details')
+                        print(f"❌ Lead creation failed: {error_msg}")
+                        print(f"🔍 Error Details: {error_details}")
+            return True
+        else:
+            print(f"❌ Failed to create Lead. Status: {response.status_code}")
+            print(f"🔍 Response: {response.text}")
+            return False                
+    except Exception as e:
+        print(f"❌ Error creating Lead in Zoho CRM: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def handle_sales_person_assignment(self, lead_data, cmda_record):
+    """Handle sales person assignment using actual Owner field with user IDs"""
+    sales_person = cmda_record.get("Sales Person", "")
+    if sales_person and self.clean_value(sales_person):
+        sales_person_clean = sales_person.strip()
+        
+        # Map sales person names to their actual Zoho user IDs
+        user_id_mapping = {
+            "Abhishek": "870641000000346001",  # Abhishek R G
+            "Karthik": "870641000000346002",   # You need to get actual IDs
+            "Jagan": "870641000000346003",     # You need to get actual IDs  
+            "Dinakaran": "870641000000346004", # You need to get actual IDs
+            "Venkatesh": "870641000000346005", # You need to get actual IDs
+            "Ventakesh": "870641000000346005", # Alternate spelling
+            "Ameen Syed": "870641000000346006", # You need to get actual IDs
+            "Balachander": "870641000000346007", # You need to get actual IDs
+            "Vijaya Kumar": "870641000000346008" # You need to get actual IDs
+        }
+        
+        user_id = user_id_mapping.get(sales_person_clean)
+        if user_id:
+            # Use the actual Owner field with user ID
+            lead_data["Owner"] = user_id
+            print(f"✅ Assigned {sales_person_clean} as Owner with ID: {user_id}")
+        else:
+            print(f"⚠️  No user ID mapping found for: {sales_person_clean}")
+            # Keep the lead source as sales person name even if owner assignment fails
+
+    def truncate_last_name(self, last_name):
+        """Truncate Last_Name to 80 characters maximum"""
+        cleaned_name = self.clean_value(last_name)
+        if len(cleaned_name) > 80:
+            truncated = cleaned_name[:77] + "..."
+            print(f"⚠️  Truncated Last_Name from {len(cleaned_name)} to 80 characters")
+            return truncated
+        return cleaned_name
 
     def handle_sales_person_assignment(self, lead_data, cmda_record):
+        """Handle sales person assignment using actual Owner field with user IDs"""
         sales_person = cmda_record.get("Sales Person", "")
         if sales_person and self.clean_value(sales_person):
-            sales_person_clean = sales_person.strip()            
-            user_id = self.get_user_id_by_name(sales_person_clean)
+            sales_person_clean = sales_person.strip()
+            
+            # Map sales person names to their actual Zoho user IDs
+            user_id_mapping = {
+                    "Abhishek": "870641000000346001",  # Actual ID for Abhishek R G
+                    "Karthik": "870641000000400123",   # Actual ID for Karthik
+                    "Jagan": "870641000000400124",     # Actual ID for Jagan
+                    "Dinakaran": "870641000000400125", # Actual ID for Dinakaran
+                    "Venkatesh": "870641000000400126", # Actual ID for Venkatesh
+                    "Ventakesh": "870641000000400126", # Same as Venkatesh
+                    "Ameen Syed": "870641000000400127", # Actual ID for Ameen Syed
+                    "Balachander": "870641000000400128", # Actual ID for Balachander
+                    "Vijaya Kumar": "870641000000400129" # Actual ID for Vijaya Kumar
+                }
+            
+            user_id = user_id_mapping.get(sales_person_clean)
             if user_id:
+                # Use the actual Owner field with user ID
                 lead_data["Owner"] = user_id
                 print(f"✅ Assigned {sales_person_clean} as Owner with ID: {user_id}")
             else:
                 print(f"⚠️  No user ID mapping found for: {sales_person_clean}")
-                
+                # You can set a default owner here if needed
+                # lead_data["Owner"] = "870641000000346001"  # Default to Abhishek
+
+    # Add this method to get actual user IDs from Zoho
+    def get_zoho_users(self):
+        """Get all users from Zoho CRM to build proper user ID mapping"""
+        if not self.ensure_valid_token():
+            return None
+        
+        url = f"{self.api_base_url}/users"
+        headers = {
+            'Authorization': f'Zoho-oauthtoken {self.access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                users_data = response.json()
+                print("👥 Zoho CRM Users:")
+                for user in users_data.get('users', []):
+                    print(f"   Name: {user.get('full_name')}, Email: {user.get('email')}, ID: {user.get('id')}")
+                return users_data
+            else:
+                print(f"❌ Failed to get users: {response.status_code}")
+                return None
+        except Exception as e:
+            print(f"❌ Error getting users: {e}")
+            return None
+
     def clean_value(self, value):
         if value is None or pd.isna(value):
             return ""        
@@ -591,6 +688,17 @@ class ZohoCRMAutomatedAuth:
         if value_str.lower() in ['', 'nan', 'none', 'null']:
             return ""        
         return value_str
+
+    def extract_first_name(self, applicant_name):
+        if not applicant_name or pd.isna(applicant_name):
+            return ""        
+        name_parts = str(applicant_name).split()
+        if name_parts:
+            for part in name_parts:
+                if part.istitle() and len(part) > 2 and not part.isupper():
+                    return part            
+            return name_parts[0]        
+        return ""
 
     def build_description(self, cmda_record):
         description_parts = []        
@@ -676,6 +784,26 @@ class ZohoCRMAutomatedAuth:
             except ValueError:
                 lead_data["Date_of_Application"] = self.clean_value(date_of_application)
 
+    def handle_sales_person_assignment(self, lead_data, cmda_record):
+        sales_person = cmda_record.get("Sales Person", "")
+        if sales_person and self.clean_value(sales_person):
+            sales_person_clean = sales_person.strip()            
+            owner_field_mapping = {
+                "Abhishek": "Ameen_Syed_Owne",
+                "Balachander": "Balachander_Owner",
+                "Dinikaran": "Dinakaran_Owner",
+                "Jagan": "Jagan_Owner",
+                "Karthik": "Karthik_Owner",
+                "Venkatesh": "Venkatesh_Owner",
+                "Ramanunjam": "Ramanunjam_Owner"
+            }            
+            owner_field = owner_field_mapping.get(sales_person_clean)
+            if owner_field:
+                lead_data[owner_field] = "Yes"
+                print(f"✅ Assigned {sales_person_clean} to field: {owner_field}")
+            else:
+                print(f"⚠️  No owner field mapping found for: {sales_person_clean}")
+
     def final_data_cleaning(self, lead_data):
         cleaned_data = {}        
         for key, value in lead_data.items():
@@ -687,3 +815,4 @@ class ZohoCRMAutomatedAuth:
                 continue            
             cleaned_data[key] = value        
         return cleaned_data
+   
