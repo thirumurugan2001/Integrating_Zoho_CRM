@@ -467,71 +467,125 @@ class ZohoCRMAutomatedAuth:
         if not self.ensure_valid_token():
             return None        
         user_id_mapping = {
-                    "Abhishek": "870641000000346001", 
-                    "Karthik": "8706410000387263",  
-                    "Jagan": "870641000006012",    
-                    "Dinakaran": "870641000538001",
-                    "Venkatesh": "870641000538014",
-                    "Ventakesh": "8706410000400126",
-                    "Ameen Syed": "87000000923037",
-                    "Balachander": "870641002815019",
-                    "Vijaya Kumar": "870641000051080",
-                    # "Karthik": "870641000000387263",  
-                    # "Jagan": "870641000000396012",    
-                    # "Dinakaran": "870641000000538001",
-                    # "Venkatesh": "870641000000538014",
-                    # "Ventakesh": "870641000000400126",
-                    # "Ameen Syed": "870641000000923037",
-                    # "Balachander": "870641000002815019",
-                    # "Vijaya Kumar": "870641000004151080"
+            "Abhishek R G": os.getenv("ZOHO_USER_ID_ABHISHEK"), 
+            "Karthik": os.getenv("ZOHO_USER_ID_KARTHIK"),  
+            "Jagan": os.getenv("ZOHO_USER_ID_JAGAN"),    
+            "Dinakaran": os.getenv("ZOHO_USER_ID_DINAKARAN"),
+            "Venkatesh": os.getenv("ZOHO_USER_ID_VENKATESH"),
+            "Ameen Syed": os.getenv("ZOHO_USER_ID_AMEEN"),
+            "Balachander": os.getenv("ZOHO_USER_ID_BALACHANDER"),
+            "Vijaya Kumar": os.getenv("ZOHO_USER_ID_VIJAYA_KUMAR"),
         }        
         return user_id_mapping.get(sales_person_name)
-    
-    
+
+    def split_applicant_name(self, applicant_name, sales_person):
+        if not applicant_name or pd.isna(applicant_name):
+            return self.split_sales_person_name(sales_person)        
+        applicant_name = str(applicant_name).strip()        
+        if len(applicant_name) > 40:
+            company_indicators = ['PVT', 'LTD', 'INC', 'LLC', 'CORP', 'ENTERPRISES', 'COMPANY', 'CO.']
+            if any(indicator in applicant_name.upper() for indicator in company_indicators):
+                return self.split_sales_person_name(sales_person)
+            else:
+                first_name = applicant_name[:40]
+                last_name = "Digital Lead" 
+                return first_name, last_name        
+        words = applicant_name.split()        
+        if len(words) == 1:
+            return applicant_name, "Digital Lead"
+        elif len(words) == 2:
+            return words[0], words[1]
+        else:
+            first_name = words[0]
+            last_name = ' '.join(words[1:])            
+            if len(first_name) > 40:
+                first_name = first_name[:40]
+                last_name = "Digital Lead"            
+            return first_name, last_name
+
+    def split_sales_person_name(self, sales_person):
+        if not sales_person or pd.isna(sales_person):
+            return "Digital", "Lead"        
+        sales_person = str(sales_person).strip()
+        words = sales_person.split()        
+        if len(words) == 1:
+            return sales_person, "Digital Lead"
+        elif len(words) >= 2:
+            name_mapping = {
+                "Abhishek R G": ("Abhishek", "R G"),
+                "Ameen Syed": ("Ameen", "Syed"),
+                "Balachander": ("Balachander", ""),
+                "Dinakaran": ("Dinakaran", ""),
+                "Jagan": ("Jagan", ""),
+                "Karthik": ("Karthik", ""),
+                "Venkatesh": ("Venkatesh", ""),
+                "Vijaya Kumar": ("Vijaya", "Kumar")
+            }            
+            if sales_person in name_mapping:
+                return name_mapping[sales_person]
+            else:
+                first_name = words[0]
+                last_name = ' '.join(words[1:]) if len(words) > 1 else "Digital Lead"                
+                if len(first_name) > 40:
+                    first_name = first_name[:40]                
+                return first_name, last_name
+        else:
+            return "Digital", "Lead"
+
     def create_lead_from_cmda_record(self, cmda_record):
-        
         if not self.ensure_valid_token():
-            return False
-        Architect_Name = f"Architect Name : {cmda_record.get("Architect Name", "Not Found")}, Architect Address :{cmda_record.get("Architect Address", "Not Found")}, Architect Email: {cmda_record.get("Architect Email", "Not Found")}"
-        print(f"🏗️ Architect_Name raw: {Architect_Name}")
+            return False        
+        Architect_Name = f"{cmda_record.get('Architect Name', '')} {cmda_record.get('Architect Address', '')} {cmda_record.get('Architect Email', '')}"
+        Architect_Name = Architect_Name.replace("nan", "").strip()
         How_Much_Square_Feet = cmda_record.get("Dwelling Unit Info", "")
         numbers = re.findall(r'\d+', str(How_Much_Square_Feet))
         if numbers:
             How_Much_Square_Feet = numbers[0]
         else:
             How_Much_Square_Feet = "0"
-        How_Much_Square_Feet = int(How_Much_Square_Feet)*1000
-        print(f"📐 How_Much_Square_Feet extracted: {How_Much_Square_Feet}")
-            
+        How_Much_Square_Feet = int(How_Much_Square_Feet) * 1000        
         sales_person = cmda_record.get("Sales Person", "")
-        sales_person_clean = self.clean_value(sales_person)        
-        lead_source = sales_person_clean if sales_person_clean else "Digital Leads"        
+        sales_person_clean = self.clean_value(sales_person)
+        owner_id = None         
+        if sales_person and self.clean_value(sales_person):
+            sales_person_clean = sales_person.strip()
+            owner_id = self.get_user_id_by_name(sales_person_clean)
+            if owner_id:
+                print(f"✅ Found user ID for {sales_person_clean}: {owner_id}")
+            else:
+                print(f"⚠️ No user ID mapping found for: {sales_person_clean}")        
+        applicant_name = cmda_record.get("Applicant Name", "")
+        first_name, last_name = self.split_applicant_name(applicant_name, sales_person_clean)
         lead_data = {
             "Planning_Permission_No": self.clean_value(cmda_record.get("Planning Permission No.", "")),
             "Email": self.clean_value(cmda_record.get("Email ID", "")),
             "Phone": self.clean_value(cmda_record.get("Mobile No.", "")),
-            "Company": cmda_record.get("Applicant Name", ""),            
-            "Nature_of_Development": self.clean_value(cmda_record.get("Nature of Development", "")),            
+            "Company": cmda_record.get("Applicant Name", ""),
+            "First_Name": first_name,
+            "Last_Name": last_name,
+            "Nature_of_Development": self.clean_value(cmda_record.get("Nature of Development", "")),
             "Area_Name": self.clean_value(cmda_record.get("Area Name", "")),
             "Site_Address": self.clean_value(cmda_record.get("Site Address", "")),
-            "Reference":"Digital Lead Abhishek",
-            "Architect_Name": Architect_Name,           
-            "Architect_Phone":cmda_record.get("Architect Mobile", "No Provided"),           
-            "Lead_Source": "Digitial Leads Abhishek",
+            "Reference": "Digital Lead Abhishek",
+            "Architect_Name": Architect_Name,
+            "Architect_Phone": cmda_record.get("Architect Mobile", "Not Provided"),
+            "Lead_Source": "Digital Leads",
             "How_Much_Square_Feet": str(How_Much_Square_Feet),
-
-            # other : fields can be added here as needed
-            "Last_Name": cmda_record.get("Sales Person", "")
+            "Billing_Area": self.clean_value(cmda_record.get("Applicant Address", "")),
         }
-        
-        self.handle_numeric_fields(lead_data, cmda_record)        
-        self.handle_picklist_fields(lead_data, cmda_record)        
-        self.handle_date_fields(lead_data, cmda_record)        
-        self.handle_sales_person_assignment(lead_data, cmda_record)
-        lead_data = self.final_data_cleaning(lead_data)       
-        print(f"📤 Sending Complete Lead data to Zoho CRM:")
-        print(f"   👤 Lead Source (Sales Person): {lead_data.get('Lead_Source', 'Not set')}")
-        print(f"   🎯 Assigned Owner ID: {lead_data.get('Owner', 'Not set')}")       
+        if owner_id:
+            lead_data["Owner"] = owner_id
+            print(f"🎯 Setting Owner field to: {owner_id}")        
+        self.handle_numeric_fields(lead_data, cmda_record)
+        self.handle_picklist_fields(lead_data, cmda_record)
+        self.handle_date_fields(lead_data, cmda_record)
+        lead_data = self.final_data_cleaning(lead_data)        
+        print(f"📤 Sending Lead data to Zoho CRM:")
+        print(f"   👤 First Name: {first_name}")
+        print(f"   👤 Last Name: {last_name}")
+        print(f"   🏢 Company: {lead_data.get('Company', 'Not set')}")
+        print(f"   🎯 Owner ID: {lead_data.get('Owner', 'Not set')}")
+        print(f"   👥 Sales Person: {sales_person_clean}")       
         url = f"{self.api_base_url}/Leads"
         headers = {
             'Authorization': f'Zoho-oauthtoken {self.access_token}',
@@ -541,22 +595,29 @@ class ZohoCRMAutomatedAuth:
             'data': [lead_data],
             'trigger': ['workflow']
         }
-        print("Data",url,payload,headers)        
         try:
             response = requests.post(url, json=payload, headers=headers)            
+            print(f"📊 Response Status: {response.status_code}")            
             if response.status_code == 201:
                 result = response.json()
-                print("✅ Lead created successfully in Zoho CRM!")
+                print("✅ Lead created successfully in Zoho CRM!")                
                 if 'data' in result:
                     for item in result['data']:
                         if item.get('status') == 'success':
                             lead_id = item.get('details', {}).get('id', 'Unknown')
-                            created_by = item.get('details', {}).get('Created_By', {}).get('name', 'Unknown')
-                            owner_name = item.get('details', {}).get('Owner', {}).get('name', 'Unknown')
-                            print(f"🎉 Lead Created Successfully! ID: {lead_id}")
-                            print(f"👤 Lead Source (Shows in UI): {lead_source}")
-                            print(f"🎯 Assigned To (Owner): {owner_name}")
-                            print(f"🛠️ Created By: {created_by}")
+                            created_by = item.get('details', {}).get('Created_By', {}).get('name', 'Unknown')                            
+                            lead_details = self.get_lead_details(lead_id)
+                            if lead_details:
+                                owner_name = lead_details.get('Owner', {}).get('name', 'Unknown')
+                                print(f"🎉 Lead Created Successfully!")
+                                print(f"   📝 Lead ID: {lead_id}")
+                                print(f"   👤 Created By: {created_by}")
+                                print(f"   🎯 Assigned To (Owner): {owner_name}")
+                                print(f"   👤 First Name: {lead_details.get('First_Name', 'Not set')}")
+                                print(f"   👤 Last Name: {lead_details.get('Last_Name', 'Not set')}")
+                            else:
+                                print(f"🎉 Lead Created Successfully! ID: {lead_id}")
+                                print(f"👤 Created By: {created_by}")
                         else:
                             error_msg = item.get('message', 'Unknown error')
                             error_details = item.get('details', 'No details')
@@ -566,12 +627,31 @@ class ZohoCRMAutomatedAuth:
             else:
                 print(f"❌ Failed to create Lead. Status: {response.status_code}")
                 print(f"🔍 Response: {response.text}")
-                return False                
+                return False
+                
         except Exception as e:
             print(f"❌ Error creating Lead in Zoho CRM: {e}")
-            import traceback
             traceback.print_exc()
             return False
+
+    def get_lead_details(self, lead_id):
+        if not self.ensure_valid_token():
+            return None
+        url = f"{self.api_base_url}/Leads/{lead_id}"
+        headers = {
+            'Authorization': f'Zoho-oauthtoken {self.access_token}',
+            'Content-Type': 'application/json'
+        }        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                return response.json().get('data', [{}])[0]
+            else:
+                print(f"⚠️ Could not fetch lead details: {response.status_code}")
+                return None
+        except Exception as e:
+            print(f"⚠️ Error fetching lead details: {e}")
+            return None
 
     def handle_sales_person_assignment(self, lead_data, cmda_record):
         sales_person = cmda_record.get("Sales Person", "")
@@ -591,31 +671,6 @@ class ZohoCRMAutomatedAuth:
         if value_str.lower() in ['', 'nan', 'none', 'null']:
             return ""        
         return value_str
-
-    def build_description(self, cmda_record):
-        description_parts = []        
-        nature = cmda_record.get("Nature of Development", "")
-        if nature and not pd.isna(nature):
-            description_parts.append(f"Nature: {nature}")        
-        site_address = cmda_record.get("Site Address", "")
-        if site_address and not pd.isna(site_address):
-            description_parts.append(f"Site: {site_address}")        
-        applicant_address = cmda_record.get("Applicant Address", "")
-        if applicant_address and not pd.isna(applicant_address):
-            description_parts.append(f"Applicant Address: {applicant_address}")        
-        file_no = cmda_record.get("File No.", "")
-        permit_no = cmda_record.get("Permit No.", "")
-        planning_no = cmda_record.get("Planning Permission No.", "")        
-        if file_no and not pd.isna(file_no):
-            description_parts.append(f"File: {file_no}")
-        if permit_no and not pd.isna(permit_no):
-            description_parts.append(f"Permit: {permit_no}")
-        if planning_no and not pd.isna(planning_no):
-            description_parts.append(f"Planning: {planning_no}")        
-        app_date = cmda_record.get("Date of Application", "")
-        if app_date and not pd.isna(app_date):
-            description_parts.append(f"Application Date: {app_date}")        
-        return " | ".join(description_parts) if description_parts else "CMDA Record"
 
     def handle_numeric_fields(self, lead_data, cmda_record):
         try:
