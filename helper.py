@@ -165,7 +165,7 @@ def assign_sales_person_to_areas(excel_file_path: str,area_column_name: str = 'A
             "Selaiyur", "Sirukalathur", "Tambaram", "Thirumudivakkam", 
             "Thiruneermalai", "Thiruvancheri", "Vandalur", "Varadarajapuram", 
             "Varadharajapuram", "Vengaivasal", "Vengambakkam", 
-            "Ward No.C of Tambaram", "Tambaram"
+            "Ward No.C of Tambaram" 
         ],
         "Dinakaran": [
             "Kottivakkam", "Kovilambakkam", "Neelangarai", "Okkiam Thoraipakkam", 
